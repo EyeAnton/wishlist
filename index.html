@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Вишлист</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎁</text></svg>">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   :root{
     --bg1:#fdf2f8; --bg2:#eef2ff;
@@ -126,20 +127,22 @@
 
   // ====== НАСТРОЙКИ (можно менять) ======
   const CONFIG = {
-    OWNER_PASSWORD: "071312", // пароль владельца — поменяйте перед публикацией
+    OWNER_EMAIL: "leritosha@gmail.com", // только этот Google-аккаунт получает права владельца
+    GOOGLE_CLIENT_ID: "PASTE_YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com", // из Google Cloud Console
     JSONBIN_BASE: "https://api.jsonbin.io/v3",
     BIN_NAME: "wishlist", // должно быть ASCII — заголовки HTTP не поддерживают кириллицу
   };
 
   const LS = {
     masterKey: "wishlist_master_key",
-    ownerMode: "wishlist_owner_mode",
+    wasOwner: "wishlist_was_owner", // не секрет — просто подсказка для тихого повторного входа
   };
 
   const state = {
     binId: null,
     items: [],
-    isOwner: localStorage.getItem(LS.ownerMode) === "1",
+    isOwner: false,
+    ownerEmail: null,
     masterKey: localStorage.getItem(LS.masterKey) || null,
     loading: false,
   };
@@ -249,40 +252,86 @@
     if(m) m.remove();
   }
 
-  function openOwnerLoginModal(){
-    openModal(`
-      <h3>Вход для владельца</h3>
-      <div class="field">
-        <label>Пароль</label>
-        <input type="password" id="ownerPasswordInput" autocomplete="current-password">
-      </div>
-      <div class="error-text" id="ownerLoginError"></div>
-      <div class="modal-actions">
-        <button class="secondary" id="cancelOwnerLogin">Отмена</button>
-        <button id="submitOwnerLogin">Войти</button>
-      </div>
-    `, overlay => {
-      const input = overlay.querySelector("#ownerPasswordInput");
-      input.focus();
-      const submit = () => {
-        const val = input.value;
-        if(val !== CONFIG.OWNER_PASSWORD){
-          overlay.querySelector("#ownerLoginError").textContent = "Неверный пароль";
-          return;
-        }
-        closeModal();
-        state.isOwner = true;
-        localStorage.setItem(LS.ownerMode, "1");
-        if(!state.masterKey){
-          openMasterKeyModal();
-        }else{
-          renderAll();
-        }
-      };
-      overlay.querySelector("#submitOwnerLogin").addEventListener("click", submit);
-      input.addEventListener("keydown", e => { if(e.key === "Enter") submit(); });
-      overlay.querySelector("#cancelOwnerLogin").addEventListener("click", closeModal);
+  // ====== ВХОД ВЛАДЕЛЬЦА ЧЕРЕЗ GOOGLE ======
+  // Доступ владельца определяется email'ом из настоящего Google-аккаунта, а не паролем в коде.
+  // ID-токен, который выдаёт Google, дополнительно проверяется через tokeninfo — это
+  // подтверждает, что токен подлинный и правда выпущен Google на этот email.
+  function initGoogleSignIn(){
+    if(!(window.google && google.accounts && google.accounts.id)){
+      setTimeout(initGoogleSignIn, 200);
+      return;
+    }
+    google.accounts.id.initialize({
+      client_id: CONFIG.GOOGLE_CLIENT_ID,
+      callback: handleGoogleCredential,
+      auto_select: true,
     });
+    renderOwnerControls();
+    // Тихий повторный вход показываем только тем, кто уже успешно логинился владельцем в этом браузере —
+    // случайным гостям окно входа в Google само по себе не всплывает.
+    if(localStorage.getItem(LS.wasOwner) === "1"){
+      google.accounts.id.prompt();
+    }
+  }
+
+  function mountGoogleButton(){
+    const container = document.getElementById("googleSignInBtn");
+    if(!container) return;
+    if(window.google && google.accounts && google.accounts.id){
+      container.innerHTML = "";
+      google.accounts.id.renderButton(container, { theme: "outline", size: "medium", text: "signin", locale: "ru" });
+    }else{
+      container.innerHTML = `<span style="color:var(--muted);font-size:.85rem;">Загрузка входа…</span>`;
+      setTimeout(mountGoogleButton, 300);
+    }
+  }
+
+  function parseJwtPayload(token){
+    const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(decodeURIComponent(escape(atob(base64))));
+  }
+
+  async function handleGoogleCredential(response){
+    try{
+      const idToken = response.credential;
+      // Локально декодированный payload используем только для быстрого показа email —
+      // решение о доступе принимаем по ответу tokeninfo, который проверяет подпись на стороне Google.
+      const localPayload = parseJwtPayload(idToken);
+
+      const verifyRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
+      if(!verifyRes.ok) throw new Error("Не удалось проверить вход через Google");
+      const payload = await verifyRes.json();
+
+      if(payload.aud !== CONFIG.GOOGLE_CLIENT_ID){
+        throw new Error("Токен выдан для другого приложения");
+      }
+      if(String(payload.email_verified) !== "true" || payload.email !== CONFIG.OWNER_EMAIL){
+        showToast("У аккаунта " + (payload.email || localPayload.email) + " нет прав владельца", true);
+        if(window.google) google.accounts.id.disableAutoSelect();
+        return;
+      }
+
+      state.isOwner = true;
+      state.ownerEmail = payload.email;
+      localStorage.setItem(LS.wasOwner, "1");
+      if(!state.masterKey){
+        openMasterKeyModal();
+      }else{
+        renderAll();
+      }
+    }catch(e){
+      showToast(e.message, true);
+    }
+  }
+
+  function ownerLogout(){
+    state.isOwner = false;
+    state.ownerEmail = null;
+    localStorage.removeItem(LS.wasOwner);
+    if(window.google && google.accounts && google.accounts.id){
+      google.accounts.id.disableAutoSelect();
+    }
+    renderAll();
   }
 
   function openMasterKeyModal(){
@@ -531,20 +580,17 @@
     const el = $("#ownerControls");
     if(state.isOwner){
       el.innerHTML = `
+        <span style="color:var(--muted);font-size:.82rem;">${escapeHtml(state.ownerEmail || "")}</span>
         <button class="secondary" id="btnAddItem">+ Добавить подарок</button>
         <button class="ghost" id="btnChangeKey">Ключ JSONBin</button>
         <button class="ghost" id="btnLogout">Выйти</button>
       `;
       $("#btnAddItem").addEventListener("click", () => openItemModal(null));
       $("#btnChangeKey").addEventListener("click", openMasterKeyModal);
-      $("#btnLogout").addEventListener("click", () => {
-        state.isOwner = false;
-        localStorage.removeItem(LS.ownerMode);
-        renderAll();
-      });
+      $("#btnLogout").addEventListener("click", ownerLogout);
     }else{
-      el.innerHTML = `<button class="ghost" id="btnOwnerLogin">Я владелец</button>`;
-      $("#btnOwnerLogin").addEventListener("click", openOwnerLoginModal);
+      el.innerHTML = `<div id="googleSignInBtn"></div>`;
+      mountGoogleButton();
     }
   }
 
@@ -672,6 +718,7 @@
   async function init(){
     state.binId = getBinIdFromUrl();
     renderAll();
+    initGoogleSignIn();
     if(state.binId){
       await refreshList();
     }
