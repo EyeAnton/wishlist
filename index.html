@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Вишлист</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎁</text></svg>">
+<style>
+  :root{
+    --bg1:#fdf2f8; --bg2:#eef2ff;
+    --card:#ffffff; --text:#2d2a3a; --muted:#8b8794;
+    --accent:#e8598a; --accent-dark:#c9407268;
+    --accent-solid:#e8598a; --accent-hover:#d84577;
+    --border:#eee3ea; --ok:#3fa672; --danger:#d9455f;
+    --shadow:0 4px 20px rgba(60,20,50,.08);
+    --radius:16px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:linear-gradient(160deg,var(--bg1),var(--bg2)); color:var(--text); min-height:100vh;
+  }
+  #app{max-width:1080px; margin:0 auto; padding:24px 20px 80px;}
+  header.topbar{
+    display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+    margin-bottom:24px;
+  }
+  header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; gap:10px;}
+  .owner-controls{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+  button{
+    font:inherit; cursor:pointer; border:none; border-radius:10px; padding:10px 16px;
+    background:var(--accent-solid); color:#fff; transition:background .15s, transform .1s;
+  }
+  button:hover{background:var(--accent-hover);}
+  button:active{transform:scale(.97);}
+  button.secondary{background:#fff; color:var(--text); border:1px solid var(--border);}
+  button.secondary:hover{background:#faf8fb;}
+  button.danger{background:var(--danger);}
+  button.danger:hover{background:#b8324a;}
+  button.ghost{background:transparent; color:var(--muted); padding:6px 10px;}
+  button.ghost:hover{background:#00000008; color:var(--text);}
+  button:disabled{opacity:.55; cursor:not-allowed;}
+  #banner{margin-bottom:18px;}
+  .banner-box{
+    background:#fff; border:1px solid var(--border); border-radius:var(--radius); padding:14px 18px;
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap; box-shadow:var(--shadow);
+  }
+  .banner-box.success{border-color:#bfe6d1;}
+  .banner-box code{background:#f6f2f5; padding:4px 8px; border-radius:6px; word-break:break-all; font-size:.85em;}
+  .empty-state{
+    text-align:center; padding:80px 20px; color:var(--muted);
+  }
+  .empty-state h2{color:var(--text); margin-bottom:8px;}
+  .grid{
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:18px;
+  }
+  .card{
+    background:var(--card); border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow);
+    display:flex; flex-direction:column; position:relative;
+  }
+  .card-img{
+    width:100%; aspect-ratio:4/3; background:#f5eef2; display:flex; align-items:center; justify-content:center;
+    font-size:2.6rem; overflow:hidden;
+  }
+  .card-img img{width:100%; height:100%; object-fit:cover; display:block;}
+  .card-body{padding:14px 16px 16px; display:flex; flex-direction:column; gap:6px; flex:1;}
+  .card-title{font-weight:600; font-size:1.05rem; margin:0;}
+  .card-price{color:var(--accent-solid); font-weight:600; font-size:.95rem;}
+  .card-note{color:var(--muted); font-size:.88rem; white-space:pre-wrap; margin:0;}
+  .card-link a{color:var(--accent-solid); font-size:.88rem; text-decoration:none;}
+  .card-link a:hover{text-decoration:underline;}
+  .card-footer{margin-top:auto; padding-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+  .reserved-badge{
+    background:#f1e9ff; color:#6b4fa3; font-size:.8rem; padding:6px 10px; border-radius:8px; font-weight:600;
+    display:flex; align-items:center; gap:6px; flex:1;
+  }
+  .owner-actions{position:absolute; top:8px; right:8px; display:flex; gap:6px;}
+  .owner-actions button{padding:6px 9px; font-size:.85rem; border-radius:8px;}
+  .full-btn{width:100%;}
+  /* modal */
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(30,20,30,.45); display:flex; align-items:center; justify-content:center;
+    padding:20px; z-index:100;
+  }
+  .modal{
+    background:#fff; border-radius:var(--radius); padding:24px; width:100%; max-width:420px;
+    box-shadow:0 10px 40px rgba(0,0,0,.2); max-height:90vh; overflow:auto;
+  }
+  .modal h3{margin-top:0;}
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:.85rem; color:var(--muted); margin-bottom:5px; font-weight:600;}
+  .field input, .field textarea{
+    width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font:inherit; background:#fdfbfc;
+  }
+  .field input:focus, .field textarea:focus{outline:2px solid var(--accent-solid); outline-offset:-1px;}
+  .field textarea{resize:vertical; min-height:60px;}
+  .field small{color:var(--muted); display:block; margin-top:4px; font-size:.78rem;}
+  .modal-actions{display:flex; justify-content:flex-end; gap:8px; margin-top:18px; flex-wrap:wrap;}
+  .modal-actions .left{margin-right:auto;}
+  .error-text{color:var(--danger); font-size:.85rem; margin-top:8px; min-height:1em;}
+  .toast{
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#2d2a3a; color:#fff;
+    padding:12px 20px; border-radius:10px; font-size:.9rem; z-index:200; box-shadow:0 4px 16px rgba(0,0,0,.25);
+  }
+  .toast.error{background:var(--danger);}
+  .spinner-row{text-align:center; padding:60px 0; color:var(--muted);}
+  @media (max-width:480px){
+    header.topbar h1{font-size:1.3rem;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <h1>🎁 Вишлист</h1>
+    <div class="owner-controls" id="ownerControls"></div>
+  </header>
+  <div id="banner"></div>
+  <main id="main"></main>
+</div>
+<div id="modalRoot"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ====== НАСТРОЙКИ (можно менять) ======
+  const CONFIG = {
+    OWNER_PASSWORD: "change-me-please", // пароль владельца — поменяйте перед публикацией
+    JSONBIN_BASE: "https://api.jsonbin.io/v3",
+    BIN_NAME: "wishlist", // должно быть ASCII — заголовки HTTP не поддерживают кириллицу
+  };
+
+  const LS = {
+    masterKey: "wishlist_master_key",
+    ownerMode: "wishlist_owner_mode",
+  };
+
+  const state = {
+    binId: null,
+    items: [],
+    isOwner: localStorage.getItem(LS.ownerMode) === "1",
+    masterKey: localStorage.getItem(LS.masterKey) || null,
+    loading: false,
+  };
+
+  // ====== УТИЛИТЫ ======
+  const $ = sel => document.querySelector(sel);
+
+  function escapeHtml(str){
+    if(str === null || str === undefined) return "";
+    return String(str).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+
+  function uid(){
+    return (crypto.randomUUID ? crypto.randomUUID() : "id-" + Date.now() + "-" + Math.random().toString(16).slice(2));
+  }
+
+  function showToast(message, isError){
+    const el = document.createElement("div");
+    el.className = "toast" + (isError ? " error" : "");
+    el.textContent = message;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3500);
+  }
+
+  function getBinIdFromUrl(){
+    return new URLSearchParams(location.search).get("bin");
+  }
+
+  function setBinIdInUrl(id){
+    const url = new URL(location.href);
+    url.searchParams.set("bin", id);
+    history.replaceState({}, "", url);
+  }
+
+  function guestLink(){
+    const url = new URL(location.href);
+    url.searchParams.set("bin", state.binId);
+    return url.toString();
+  }
+
+  // ====== JSONBIN API ======
+  async function apiGetLatest(binId){
+    const res = await fetch(`${CONFIG.JSONBIN_BASE}/b/${binId}/latest`, {
+      headers: { "X-Bin-Meta": "false" },
+      cache: "no-store",
+    });
+    if(!res.ok) throw new Error("Не удалось загрузить список (код " + res.status + ")");
+    return res.json();
+  }
+
+  async function apiCreateBin(masterKey, data){
+    const res = await fetch(`${CONFIG.JSONBIN_BASE}/b`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Master-Key": masterKey,
+        "X-Bin-Private": "false",
+        "X-Bin-Name": CONFIG.BIN_NAME,
+      },
+      body: JSON.stringify(data),
+    });
+    if(!res.ok){
+      if(res.status === 401) throw new Error("Неверный Master Key");
+      throw new Error("Не удалось создать список (код " + res.status + ")");
+    }
+    const json = await res.json();
+    return json.metadata.id;
+  }
+
+  async function apiUpdateBin(binId, masterKey, data){
+    const headers = { "Content-Type": "application/json" };
+    if(masterKey) headers["X-Master-Key"] = masterKey;
+    const res = await fetch(`${CONFIG.JSONBIN_BASE}/b/${binId}`, {
+      method: "PUT",
+      headers,
+      body: JSON.stringify(data),
+    });
+    if(!res.ok) throw new Error("Не удалось сохранить изменения (код " + res.status + ")");
+    return res.json();
+  }
+
+  // Всегда перечитывает актуальный список перед записью, чтобы не затирать чужие правки.
+  async function mutateItems(mutator){
+    let items = state.items;
+    try{
+      const fresh = await apiGetLatest(state.binId);
+      items = (fresh && fresh.items) ? fresh.items : items;
+    }catch(e){ /* используем то, что уже есть в памяти */ }
+    const updated = mutator(items.slice());
+    await apiUpdateBin(state.binId, state.isOwner ? state.masterKey : null, { items: updated });
+    state.items = updated;
+  }
+
+  // ====== МОДАЛЬНЫЕ ОКНА ======
+  function openModal(html, onMount){
+    closeModal();
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.id = "activeModal";
+    overlay.innerHTML = `<div class="modal">${html}</div>`;
+    overlay.addEventListener("click", e => { if(e.target === overlay) closeModal(); });
+    document.getElementById("modalRoot").appendChild(overlay);
+    if(onMount) onMount(overlay);
+  }
+  function closeModal(){
+    const m = document.getElementById("activeModal");
+    if(m) m.remove();
+  }
+
+  function openOwnerLoginModal(){
+    openModal(`
+      <h3>Вход для владельца</h3>
+      <div class="field">
+        <label>Пароль</label>
+        <input type="password" id="ownerPasswordInput" autocomplete="current-password">
+      </div>
+      <div class="error-text" id="ownerLoginError"></div>
+      <div class="modal-actions">
+        <button class="secondary" id="cancelOwnerLogin">Отмена</button>
+        <button id="submitOwnerLogin">Войти</button>
+      </div>
+    `, overlay => {
+      const input = overlay.querySelector("#ownerPasswordInput");
+      input.focus();
+      const submit = () => {
+        const val = input.value;
+        if(val !== CONFIG.OWNER_PASSWORD){
+          overlay.querySelector("#ownerLoginError").textContent = "Неверный пароль";
+          return;
+        }
+        closeModal();
+        state.isOwner = true;
+        localStorage.setItem(LS.ownerMode, "1");
+        if(!state.masterKey){
+          openMasterKeyModal();
+        }else{
+          renderAll();
+        }
+      };
+      overlay.querySelector("#submitOwnerLogin").addEventListener("click", submit);
+      input.addEventListener("keydown", e => { if(e.key === "Enter") submit(); });
+      overlay.querySelector("#cancelOwnerLogin").addEventListener("click", closeModal);
+    });
+  }
+
+  function openMasterKeyModal(){
+    openModal(`
+      <h3>JSONBin Master Key</h3>
+      <p style="font-size:.88rem;color:var(--muted);margin-top:-6px;">
+        Нужен один раз, чтобы создать/сохранять список. Возьмите его в личном кабинете на
+        <a href="https://jsonbin.io" target="_blank" rel="noopener">jsonbin.io</a> (X-Master-Key).
+        Ключ хранится только в этом браузере (localStorage).
+      </p>
+      <div class="field">
+        <label>Master Key</label>
+        <input type="password" id="masterKeyInput" autocomplete="off">
+      </div>
+      <div class="error-text" id="masterKeyError"></div>
+      <div class="modal-actions">
+        <button class="secondary" id="cancelMasterKey">Отмена</button>
+        <button id="submitMasterKey">Сохранить</button>
+      </div>
+    `, overlay => {
+      const input = overlay.querySelector("#masterKeyInput");
+      input.focus();
+      overlay.querySelector("#submitMasterKey").addEventListener("click", () => {
+        const val = input.value.trim();
+        if(!val){
+          overlay.querySelector("#masterKeyError").textContent = "Введите ключ";
+          return;
+        }
+        state.masterKey = val;
+        localStorage.setItem(LS.masterKey, val);
+        closeModal();
+        renderAll();
+      });
+      overlay.querySelector("#cancelMasterKey").addEventListener("click", () => {
+        closeModal();
+        renderAll();
+      });
+    });
+  }
+
+  function openItemModal(existingItem){
+    const isEdit = !!existingItem;
+    const item = existingItem || { title:"", note:"", price:"", link:"", image:"" };
+    openModal(`
+      <h3>${isEdit ? "Редактировать подарок" : "Добавить подарок"}</h3>
+      <div class="field">
+        <label>Название *</label>
+        <input type="text" id="fTitle" value="${escapeHtml(item.title)}">
+      </div>
+      <div class="field">
+        <label>Цена</label>
+        <input type="text" id="fPrice" value="${escapeHtml(item.price)}" placeholder="напр. 2000 ₽">
+      </div>
+      <div class="field">
+        <label>Ссылка</label>
+        <input type="text" id="fLink" value="${escapeHtml(item.link)}" placeholder="https://...">
+      </div>
+      <div class="field">
+        <label>Картинка (URL)</label>
+        <input type="text" id="fImage" value="${escapeHtml(item.image)}" placeholder="https://...">
+      </div>
+      <div class="field">
+        <label>Заметка</label>
+        <textarea id="fNote">${escapeHtml(item.note)}</textarea>
+      </div>
+      <div class="error-text" id="itemError"></div>
+      <div class="modal-actions">
+        ${isEdit ? '<button class="danger left" id="deleteItemBtn">Удалить</button>' : ""}
+        ${isEdit && item.reservedBy ? '<button class="secondary" id="unreserveBtn">Снять бронь</button>' : ""}
+        <button class="secondary" id="cancelItem">Отмена</button>
+        <button id="saveItem">Сохранить</button>
+      </div>
+    `, overlay => {
+      overlay.querySelector("#fTitle").focus();
+      overlay.querySelector("#cancelItem").addEventListener("click", closeModal);
+
+      if(isEdit){
+        overlay.querySelector("#deleteItemBtn").addEventListener("click", async () => {
+          if(!confirm("Удалить этот подарок из списка?")) return;
+          await withLoadingButton(overlay.querySelector("#deleteItemBtn"), async () => {
+            await mutateItems(items => items.filter(i => i.id !== item.id));
+            closeModal();
+            renderAll();
+            showToast("Подарок удалён");
+          });
+        });
+        const unreserveBtn = overlay.querySelector("#unreserveBtn");
+        if(unreserveBtn){
+          unreserveBtn.addEventListener("click", async () => {
+            await withLoadingButton(unreserveBtn, async () => {
+              await mutateItems(items => items.map(i => i.id === item.id ? {...i, reservedBy:""} : i));
+              closeModal();
+              renderAll();
+              showToast("Бронь снята");
+            });
+          });
+        }
+      }
+
+      overlay.querySelector("#saveItem").addEventListener("click", async () => {
+        const title = overlay.querySelector("#fTitle").value.trim();
+        if(!title){
+          overlay.querySelector("#itemError").textContent = "Введите название";
+          return;
+        }
+        const data = {
+          title,
+          price: overlay.querySelector("#fPrice").value.trim(),
+          link: overlay.querySelector("#fLink").value.trim(),
+          image: overlay.querySelector("#fImage").value.trim(),
+          note: overlay.querySelector("#fNote").value.trim(),
+        };
+        const saveBtn = overlay.querySelector("#saveItem");
+        await withLoadingButton(saveBtn, async () => {
+          try{
+            await ensureBinExists();
+            if(isEdit){
+              await mutateItems(items => items.map(i => i.id === item.id ? {...i, ...data} : i));
+            }else{
+              const newItem = { id: uid(), reservedBy: "", ...data };
+              await mutateItems(items => [...items, newItem]);
+            }
+            closeModal();
+            renderAll();
+            showToast("Сохранено");
+          }catch(e){
+            overlay.querySelector("#itemError").textContent = e.message;
+          }
+        });
+      });
+    });
+  }
+
+  function openReserveModal(item){
+    openModal(`
+      <h3>Забронировать «${escapeHtml(item.title)}»</h3>
+      <div class="field">
+        <label>Ваше имя</label>
+        <input type="text" id="reserveName" placeholder="Как вас представить дарителям?">
+      </div>
+      <div class="error-text" id="reserveError"></div>
+      <div class="modal-actions">
+        <button class="secondary" id="cancelReserve">Отмена</button>
+        <button id="confirmReserve">Забронировать</button>
+      </div>
+    `, overlay => {
+      const input = overlay.querySelector("#reserveName");
+      input.focus();
+      overlay.querySelector("#cancelReserve").addEventListener("click", closeModal);
+      const submit = async () => {
+        const name = input.value.trim();
+        if(!name){
+          overlay.querySelector("#reserveError").textContent = "Введите имя";
+          return;
+        }
+        const btn = overlay.querySelector("#confirmReserve");
+        await withLoadingButton(btn, async () => {
+          try{
+            await mutateItems(items => items.map(i => {
+              if(i.id !== item.id) return i;
+              if(i.reservedBy) throw new Error("Этот подарок уже забронировали");
+              return {...i, reservedBy: name};
+            }));
+            closeModal();
+            renderAll();
+            showToast("Забронировано! Спасибо 🎉");
+          }catch(e){
+            overlay.querySelector("#reserveError").textContent = e.message;
+          }
+        });
+      };
+      overlay.querySelector("#confirmReserve").addEventListener("click", submit);
+      input.addEventListener("keydown", e => { if(e.key === "Enter") submit(); });
+    });
+  }
+
+  function openCancelReserveModal(item){
+    openModal(`
+      <h3>Отменить бронь «${escapeHtml(item.title)}»</h3>
+      <p style="font-size:.88rem;color:var(--muted);margin-top:-6px;">Введите имя, на которое бронировали, чтобы снять бронь.</p>
+      <div class="field">
+        <label>Имя</label>
+        <input type="text" id="cancelName">
+      </div>
+      <div class="error-text" id="cancelError"></div>
+      <div class="modal-actions">
+        <button class="secondary" id="cancelCancelReserve">Назад</button>
+        <button class="danger" id="confirmCancelReserve">Снять бронь</button>
+      </div>
+    `, overlay => {
+      const input = overlay.querySelector("#cancelName");
+      input.focus();
+      overlay.querySelector("#cancelCancelReserve").addEventListener("click", closeModal);
+      overlay.querySelector("#confirmCancelReserve").addEventListener("click", async () => {
+        const name = input.value.trim();
+        if(!name || name.toLowerCase() !== (item.reservedBy||"").toLowerCase()){
+          overlay.querySelector("#cancelError").textContent = "Имя не совпадает";
+          return;
+        }
+        const btn = overlay.querySelector("#confirmCancelReserve");
+        await withLoadingButton(btn, async () => {
+          await mutateItems(items => items.map(i => i.id === item.id ? {...i, reservedBy:""} : i));
+          closeModal();
+          renderAll();
+          showToast("Бронь снята");
+        });
+      });
+    });
+  }
+
+  async function withLoadingButton(btn, fn){
+    const original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "…";
+    try{
+      await fn();
+    }catch(e){
+      showToast(e.message || "Ошибка", true);
+    }finally{
+      if(document.body.contains(btn)){
+        btn.disabled = false;
+        btn.textContent = original;
+      }
+    }
+  }
+
+  // Создаёт bin при самом первом сохранении, если его ещё нет.
+  async function ensureBinExists(){
+    if(state.binId) return;
+    if(!state.masterKey){
+      throw new Error("Нет Master Key — войдите заново как владелец");
+    }
+    const id = await apiCreateBin(state.masterKey, { items: state.items });
+    state.binId = id;
+    setBinIdInUrl(id);
+  }
+
+  // ====== РЕНДЕР ======
+  function renderAll(){
+    renderOwnerControls();
+    renderBanner();
+    renderMain();
+  }
+
+  function renderOwnerControls(){
+    const el = $("#ownerControls");
+    if(state.isOwner){
+      el.innerHTML = `
+        <button class="secondary" id="btnAddItem">+ Добавить подарок</button>
+        <button class="ghost" id="btnChangeKey">Ключ JSONBin</button>
+        <button class="ghost" id="btnLogout">Выйти</button>
+      `;
+      $("#btnAddItem").addEventListener("click", () => openItemModal(null));
+      $("#btnChangeKey").addEventListener("click", openMasterKeyModal);
+      $("#btnLogout").addEventListener("click", () => {
+        state.isOwner = false;
+        localStorage.removeItem(LS.ownerMode);
+        renderAll();
+      });
+    }else{
+      el.innerHTML = `<button class="ghost" id="btnOwnerLogin">Я владелец</button>`;
+      $("#btnOwnerLogin").addEventListener("click", openOwnerLoginModal);
+    }
+  }
+
+  function renderBanner(){
+    const el = $("#banner");
+    if(state.isOwner && state.binId){
+      el.innerHTML = `
+        <div class="banner-box success">
+          <span>Ссылка для гостей:</span>
+          <code>${escapeHtml(guestLink())}</code>
+          <button class="secondary" id="copyLinkBtn">Копировать</button>
+        </div>
+      `;
+      $("#copyLinkBtn").addEventListener("click", async () => {
+        try{
+          await navigator.clipboard.writeText(guestLink());
+          showToast("Ссылка скопирована");
+        }catch(e){
+          showToast("Не удалось скопировать — скопируйте вручную", true);
+        }
+      });
+    }else{
+      el.innerHTML = "";
+    }
+  }
+
+  function renderMain(){
+    const el = $("#main");
+
+    if(!state.binId){
+      if(state.isOwner){
+        el.innerHTML = `
+          <div class="empty-state">
+            <h2>Список пока пуст</h2>
+            <p>Добавьте первый подарок — ссылка для гостей появится автоматически после сохранения.</p>
+          </div>
+        `;
+      }else{
+        el.innerHTML = `
+          <div class="empty-state">
+            <h2>Вишлист ещё не настроен</h2>
+            <p>Если вы владелец — войдите в правом верхнем углу, чтобы создать список.</p>
+          </div>
+        `;
+      }
+      return;
+    }
+
+    if(state.loading){
+      el.innerHTML = `<div class="spinner-row">Загрузка…</div>`;
+      return;
+    }
+
+    if(state.items.length === 0){
+      el.innerHTML = `<div class="empty-state"><h2>Список пуст</h2><p>Пока здесь ничего нет.</p></div>`;
+      return;
+    }
+
+    el.innerHTML = `<div class="grid">${state.items.map(renderCard).join("")}</div>`;
+
+    state.items.forEach(item => {
+      const card = el.querySelector(`[data-id="${item.id}"]`);
+      if(!card) return;
+      if(state.isOwner){
+        card.querySelector(".editBtn")?.addEventListener("click", () => openItemModal(item));
+      }else{
+        card.querySelector(".reserveBtn")?.addEventListener("click", () => openReserveModal(item));
+        card.querySelector(".cancelReserveBtn")?.addEventListener("click", () => openCancelReserveModal(item));
+      }
+    });
+  }
+
+  function renderCard(item){
+    const img = item.image
+      ? `<img src="${escapeHtml(item.image)}" alt="" onerror="this.parentElement.innerHTML='🎁'">`
+      : "🎁";
+    return `
+      <div class="card" data-id="${escapeHtml(item.id)}">
+        ${state.isOwner ? `<div class="owner-actions"><button class="secondary editBtn">✎</button></div>` : ""}
+        <div class="card-img">${img}</div>
+        <div class="card-body">
+          <p class="card-title">${escapeHtml(item.title)}</p>
+          ${item.price ? `<div class="card-price">${escapeHtml(item.price)}</div>` : ""}
+          ${item.note ? `<p class="card-note">${escapeHtml(item.note)}</p>` : ""}
+          ${item.link ? `<div class="card-link"><a href="${escapeHtml(item.link)}" target="_blank" rel="noopener">Открыть ссылку →</a></div>` : ""}
+          <div class="card-footer">
+            ${renderCardFooter(item)}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderCardFooter(item){
+    if(state.isOwner){
+      return item.reservedBy
+        ? `<span class="reserved-badge">🎗 Забронировано: ${escapeHtml(item.reservedBy)}</span>`
+        : `<span style="color:var(--muted);font-size:.85rem;">Свободно</span>`;
+    }
+    if(item.reservedBy){
+      return `
+        <span class="reserved-badge">🎗 Забронировано: ${escapeHtml(item.reservedBy)}</span>
+        <button class="ghost cancelReserveBtn" style="font-size:.78rem;">не я / отменить</button>
+      `;
+    }
+    return `<button class="full-btn reserveBtn">Забронировать</button>`;
+  }
+
+  async function refreshList(){
+    state.loading = true;
+    renderMain();
+    try{
+      const data = await apiGetLatest(state.binId);
+      state.items = (data && data.items) || [];
+    }catch(e){
+      showToast(e.message, true);
+      state.items = [];
+    }finally{
+      state.loading = false;
+      renderAll();
+    }
+  }
+
+  // ====== СТАРТ ======
+  async function init(){
+    state.binId = getBinIdFromUrl();
+    renderAll();
+    if(state.binId){
+      await refreshList();
+    }
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
