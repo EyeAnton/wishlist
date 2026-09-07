@@ -181,15 +181,59 @@ import { getDatabase, ref, set, update, remove, onValue } from 'https://www.gsta
   }
 
   // ====== "УМНОЕ" ЗАПОЛНЕНИЕ ПО ССЫЛКЕ ======
-  // Своего бэкенда нет (статический сайт), поэтому страницу товара тянем через публичный
-  // CORS-прокси и парсим Open Graph / JSON-LD прямо в браузере. Магазины вроде Amazon
-  // иногда отдают ботам капчу вместо страницы — тогда просто ничего не найдётся,
+  // Своего бэкенда нет (статический сайт), поэтому страницу товара тянем через публичные
+  // CORS-прокси и парсим Open Graph / JSON-LD прямо в браузере. Бесплатные прокси регулярно
+  // падают или упираются в rate limit, поэтому пробуем несколько по очереди. Магазины вроде
+  // Amazon иногда отдают ботам капчу вместо страницы — тогда просто ничего не найдётся,
   // это ожидаемо для бесплатного варианта без своего сервера.
+  async function fetchWithTimeout(url, ms){
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ms);
+    try{
+      return await fetch(url, { signal: ctrl.signal });
+    }finally{
+      clearTimeout(timer);
+    }
+  }
+
+  const HTML_PROXIES = [
+    url => "https://api.allorigins.win/raw?url=" + encodeURIComponent(url),
+    url => "https://api.cors.lol/?url=" + encodeURIComponent(url),
+  ];
+
+  async function fetchHtmlViaProxies(url){
+    let lastError = null;
+    for(const buildProxyUrl of HTML_PROXIES){
+      try{
+        const res = await fetchWithTimeout(buildProxyUrl(url), 9000);
+        if(!res.ok) throw new Error("код " + res.status);
+        const text = await res.text();
+        if(text && text.length > 200 && !/rate limit/i.test(text)) return text;
+        lastError = new Error("прокси вернул пустой ответ");
+      }catch(e){
+        lastError = e;
+      }
+    }
+    throw lastError || new Error("ни один прокси не ответил");
+  }
+
+  // Резервный вариант, когда все HTML-прокси недоступны: читаемый текст страницы
+  // без разметки — картинку и цену так не достать, но хотя бы название товара.
+  async function fetchTitleOnlyFallback(url){
+    const res = await fetchWithTimeout("https://r.jina.ai/" + url, 9000);
+    if(!res.ok) throw new Error("код " + res.status);
+    const text = await res.text();
+    const match = text.match(/^Title:\s*(.+)$/m);
+    return { title: match ? match[1].trim() : "", image: "", price: "" };
+  }
+
   async function fetchLinkPreview(url){
-    const proxied = "https://api.allorigins.win/raw?url=" + encodeURIComponent(url);
-    const res = await fetch(proxied);
-    if(!res.ok) throw new Error("страница не открылась (код " + res.status + ")");
-    const html = await res.text();
+    let html;
+    try{
+      html = await fetchHtmlViaProxies(url);
+    }catch(e){
+      return await fetchTitleOnlyFallback(url);
+    }
     const doc = new DOMParser().parseFromString(html, "text/html");
 
     const getMeta = (...names) => {
