@@ -181,11 +181,10 @@ import { getDatabase, ref, set, update, remove, onValue } from 'https://www.gsta
   }
 
   // ====== "УМНОЕ" ЗАПОЛНЕНИЕ ПО ССЫЛКЕ ======
-  // Своего бэкенда нет (статический сайт), поэтому страницу товара тянем через публичные
-  // CORS-прокси и парсим Open Graph / JSON-LD прямо в браузере. Бесплатные прокси регулярно
-  // падают или упираются в rate limit, поэтому пробуем несколько по очереди. Магазины вроде
-  // Amazon иногда отдают ботам капчу вместо страницы — тогда просто ничего не найдётся,
-  // это ожидаемо для бесплатного варианта без своего сервера.
+  // Основной путь — свой Cloudflare Worker (собственный прокси с подменой User-Agent,
+  // без чужих rate limit'ов). Публичные CORS-прокси оставлены как запасной вариант —
+  // они регулярно падают или упираются в rate limit. Магазины вроде Amazon иногда
+  // всё равно отдают ботам капчу — тогда просто ничего не найдётся.
   async function fetchWithTimeout(url, ms){
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), ms);
@@ -197,6 +196,7 @@ import { getDatabase, ref, set, update, remove, onValue } from 'https://www.gsta
   }
 
   const HTML_PROXIES = [
+    url => "https://winter-dust-4aa9.leritosha.workers.dev/?url=" + encodeURIComponent(url),
     url => "https://api.allorigins.win/raw?url=" + encodeURIComponent(url),
     url => "https://api.cors.lol/?url=" + encodeURIComponent(url),
   ];
