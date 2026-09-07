@@ -180,6 +180,61 @@ import { getDatabase, ref, set, update, remove, onValue } from 'https://www.gsta
     return ref(db, "items/" + id);
   }
 
+  // ====== "УМНОЕ" ЗАПОЛНЕНИЕ ПО ССЫЛКЕ ======
+  // Своего бэкенда нет (статический сайт), поэтому страницу товара тянем через публичный
+  // CORS-прокси и парсим Open Graph / JSON-LD прямо в браузере. Магазины вроде Amazon
+  // иногда отдают ботам капчу вместо страницы — тогда просто ничего не найдётся,
+  // это ожидаемо для бесплатного варианта без своего сервера.
+  async function fetchLinkPreview(url){
+    const proxied = "https://api.allorigins.win/raw?url=" + encodeURIComponent(url);
+    const res = await fetch(proxied);
+    if(!res.ok) throw new Error("страница не открылась (код " + res.status + ")");
+    const html = await res.text();
+    const doc = new DOMParser().parseFromString(html, "text/html");
+
+    const getMeta = (...names) => {
+      for(const name of names){
+        const el = doc.querySelector(`meta[property="${name}"], meta[name="${name}"]`);
+        const content = el && el.getAttribute("content");
+        if(content && content.trim()) return content.trim();
+      }
+      return "";
+    };
+
+    const title = getMeta("og:title", "twitter:title") || (doc.querySelector("title")?.textContent || "").trim();
+    const image = getMeta("og:image", "og:image:secure_url", "twitter:image");
+
+    let price = getMeta("product:price:amount", "og:price:amount");
+    const currency = getMeta("product:price:currency", "og:price:currency");
+
+    if(!price){
+      const priceEl = doc.querySelector(
+        '.a-price .a-offscreen, #priceblock_ourprice, #priceblock_dealprice, [itemprop="price"]'
+      );
+      if(priceEl){
+        price = (priceEl.getAttribute("content") || priceEl.textContent || "").trim();
+      }
+    }
+
+    if(!price){
+      for(const script of doc.querySelectorAll('script[type="application/ld+json"]')){
+        let parsed;
+        try{ parsed = JSON.parse(script.textContent); }catch(e){ continue; }
+        for(const block of Array.isArray(parsed) ? parsed : [parsed]){
+          const offer = block?.offers?.[0] || block?.offers;
+          if(offer?.price){ price = String(offer.price); break; }
+        }
+        if(price) break;
+      }
+    }
+
+    if(price && currency && !/[a-zA-Zа-яА-Я₽$€]/.test(price)){
+      price = `${price} ${currency}`;
+    }
+
+    return { title, image, price };
+  }
+
   // ====== МОДАЛЬНЫЕ ОКНА ======
   function openModal(html, onMount){
     closeModal();
@@ -255,6 +310,10 @@ import { getDatabase, ref, set, update, remove, onValue } from 'https://www.gsta
       <div class="field">
         <label>Ссылка</label>
         <input type="text" id="fLink" value="${escapeHtml(item.link)}" placeholder="https://...">
+        <div style="margin-top:6px;display:flex;align-items:center;gap:10px;">
+          <button type="button" class="secondary" id="fetchLinkBtn" style="font-size:.82rem;padding:6px 12px;">🔍 Подтянуть по ссылке</button>
+          <span id="fetchLinkStatus" style="font-size:.8rem;color:var(--muted);"></span>
+        </div>
       </div>
       <div class="field">
         <label>Картинка (URL)</label>
@@ -274,6 +333,28 @@ import { getDatabase, ref, set, update, remove, onValue } from 'https://www.gsta
     `, overlay => {
       overlay.querySelector("#fTitle").focus();
       overlay.querySelector("#cancelItem").addEventListener("click", closeModal);
+
+      overlay.querySelector("#fetchLinkBtn").addEventListener("click", async () => {
+        const url = overlay.querySelector("#fLink").value.trim();
+        const statusEl = overlay.querySelector("#fetchLinkStatus");
+        if(!url){ statusEl.textContent = "Сначала вставьте ссылку"; return; }
+        const btn = overlay.querySelector("#fetchLinkBtn");
+        await withLoadingButton(btn, async () => {
+          statusEl.textContent = "Загружаем…";
+          try{
+            const data = await fetchLinkPreview(url);
+            const titleInput = overlay.querySelector("#fTitle");
+            if(data.title && !titleInput.value.trim()) titleInput.value = data.title;
+            if(data.image) overlay.querySelector("#fImage").value = data.image;
+            if(data.price) overlay.querySelector("#fPrice").value = data.price;
+            statusEl.textContent = (data.image || data.price || data.title)
+              ? "Готово"
+              : "Не нашли данные на странице — впишите вручную";
+          }catch(e){
+            statusEl.textContent = "Не получилось: " + e.message;
+          }
+        });
+      });
 
       if(isEdit){
         overlay.querySelector("#deleteItemBtn").addEventListener("click", async () => {
