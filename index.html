@@ -217,6 +217,14 @@ import { getDatabase, ref, set, update, remove, onValue } from 'https://www.gsta
     throw lastError || new Error("ни один прокси не ответил");
   }
 
+  // <title> часто выглядит как "Магазин: Название товара : Категория" — вытаскиваем
+  // самый длинный кусок между двоеточиями, обычно это и есть само название.
+  function cleanupTitle(title){
+    const parts = title.split(/\s*:\s*/).map(s => s.trim()).filter(Boolean);
+    if(parts.length <= 1) return title.trim();
+    return parts.reduce((a, b) => b.length > a.length ? b : a);
+  }
+
   // Резервный вариант, когда все HTML-прокси недоступны: читаемый текст страницы
   // без разметки — картинку и цену так не достать, но хотя бы название товара.
   async function fetchTitleOnlyFallback(url){
@@ -224,7 +232,7 @@ import { getDatabase, ref, set, update, remove, onValue } from 'https://www.gsta
     if(!res.ok) throw new Error("код " + res.status);
     const text = await res.text();
     const match = text.match(/^Title:\s*(.+)$/m);
-    return { title: match ? match[1].trim() : "", image: "", price: "" };
+    return { title: match ? cleanupTitle(match[1]) : "", image: "", price: "" };
   }
 
   async function fetchLinkPreview(url){
