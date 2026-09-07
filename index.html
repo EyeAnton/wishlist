@@ -253,8 +253,24 @@ import { getDatabase, ref, set, update, remove, onValue } from 'https://www.gsta
       return "";
     };
 
-    const title = getMeta("og:title", "twitter:title") || (doc.querySelector("title")?.textContent || "").trim();
-    const image = getMeta("og:image", "og:image:secure_url", "twitter:image");
+    const title = cleanupTitle(getMeta("og:title", "twitter:title") || (doc.querySelector("title")?.textContent || "").trim());
+    let image = getMeta("og:image", "og:image:secure_url", "twitter:image");
+
+    if(!image){
+      // Amazon не кладёт og:image на страницы товаров — картинка лежит в атрибутах
+      // главного изображения (data-old-hires — уже готовая ссылка на полный размер).
+      const landing = doc.querySelector("#landingImage, #imgBlkFront");
+      if(landing){
+        image = landing.getAttribute("data-old-hires") || "";
+        if(!image){
+          const dynamic = landing.getAttribute("data-a-dynamic-image");
+          if(dynamic){
+            try{ image = Object.keys(JSON.parse(dynamic))[0] || ""; }catch(e){ /* не JSON — пропускаем */ }
+          }
+        }
+        if(!image) image = landing.getAttribute("src") || "";
+      }
+    }
 
     let price = getMeta("product:price:amount", "og:price:amount");
     const currency = getMeta("product:price:currency", "og:price:currency");
