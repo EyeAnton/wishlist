@@ -115,7 +115,6 @@
     <h1>🎁 Вишлист</h1>
     <div class="owner-controls" id="ownerControls"></div>
   </header>
-  <div id="banner"></div>
   <main id="main"></main>
 </div>
 <div id="modalRoot"></div>
@@ -123,6 +122,7 @@
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getDatabase, ref, set, update, remove, onValue } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 (function(){
   "use strict";
@@ -130,32 +130,25 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChang
   // ====== НАСТРОЙКИ (можно менять) ======
   const CONFIG = {
     OWNER_EMAIL: "leritosha@gmail.com", // только этот Google-аккаунт получает права владельца
-    // Отдельный Firebase-проект "wishlist" (console.firebase.google.com), используется только для входа —
-    // те же принципы, что и в leritonmap: вход через Google, доступ владельца по email.
+    // Отдельный Firebase-проект "wishlist" (console.firebase.google.com) — вход и хранение данных,
+    // те же принципы, что и в leritonmap: вход через Google, доступ владельца по email,
+    // правила Realtime Database ограничивают запись гостей только полем reservedBy.
     FIREBASE_CONFIG: {
       apiKey: "AIzaSyCWSp3MjlZPxAs6hrROmI83U-QxzKzej8w",
       authDomain: "wishlist-92432.firebaseapp.com",
+      databaseURL: "https://wishlist-92432-default-rtdb.firebaseio.com",
       projectId: "wishlist-92432",
       storageBucket: "wishlist-92432.firebasestorage.app",
       messagingSenderId: "193096293416",
       appId: "1:193096293416:web:ff4618fb4556da8ba6e91d",
     },
-    JSONBIN_BASE: "https://api.jsonbin.io/v3",
-    BIN_NAME: "wishlist", // должно быть ASCII — заголовки HTTP не поддерживают кириллицу
-  };
-
-  const LS = {
-    masterKey: "wishlist_master_key",
-    wasOwner: "wishlist_was_owner", // не секрет — просто подсказка для тихого повторного входа
   };
 
   const state = {
-    binId: null,
     items: [],
     isOwner: false,
     ownerEmail: null,
-    masterKey: localStorage.getItem(LS.masterKey) || null,
-    loading: false,
+    loading: true,
   };
 
   // ====== УТИЛИТЫ ======
@@ -178,73 +171,13 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChang
     setTimeout(() => el.remove(), 3500);
   }
 
-  function getBinIdFromUrl(){
-    return new URLSearchParams(location.search).get("bin");
-  }
+  // ====== ХРАНЕНИЕ (Firebase Realtime Database) ======
+  // Один список на весь сайт — отдельный per-list ID (как раньше JSONBin bin) не нужен:
+  // это выделенный Firebase-проект только для этого вишлиста.
+  let db = null;
 
-  function setBinIdInUrl(id){
-    const url = new URL(location.href);
-    url.searchParams.set("bin", id);
-    history.replaceState({}, "", url);
-  }
-
-  function guestLink(){
-    const url = new URL(location.href);
-    url.searchParams.set("bin", state.binId);
-    return url.toString();
-  }
-
-  // ====== JSONBIN API ======
-  async function apiGetLatest(binId){
-    const res = await fetch(`${CONFIG.JSONBIN_BASE}/b/${binId}/latest`, {
-      headers: { "X-Bin-Meta": "false" },
-      cache: "no-store",
-    });
-    if(!res.ok) throw new Error("Не удалось загрузить список (код " + res.status + ")");
-    return res.json();
-  }
-
-  async function apiCreateBin(masterKey, data){
-    const res = await fetch(`${CONFIG.JSONBIN_BASE}/b`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Master-Key": masterKey,
-        "X-Bin-Private": "false",
-        "X-Bin-Name": CONFIG.BIN_NAME,
-      },
-      body: JSON.stringify(data),
-    });
-    if(!res.ok){
-      if(res.status === 401) throw new Error("Неверный Master Key");
-      throw new Error("Не удалось создать список (код " + res.status + ")");
-    }
-    const json = await res.json();
-    return json.metadata.id;
-  }
-
-  async function apiUpdateBin(binId, masterKey, data){
-    const headers = { "Content-Type": "application/json" };
-    if(masterKey) headers["X-Master-Key"] = masterKey;
-    const res = await fetch(`${CONFIG.JSONBIN_BASE}/b/${binId}`, {
-      method: "PUT",
-      headers,
-      body: JSON.stringify(data),
-    });
-    if(!res.ok) throw new Error("Не удалось сохранить изменения (код " + res.status + ")");
-    return res.json();
-  }
-
-  // Всегда перечитывает актуальный список перед записью, чтобы не затирать чужие правки.
-  async function mutateItems(mutator){
-    let items = state.items;
-    try{
-      const fresh = await apiGetLatest(state.binId);
-      items = (fresh && fresh.items) ? fresh.items : items;
-    }catch(e){ /* используем то, что уже есть в памяти */ }
-    const updated = mutator(items.slice());
-    await apiUpdateBin(state.binId, state.isOwner ? state.masterKey : null, { items: updated });
-    state.items = updated;
+  function itemRef(id){
+    return ref(db, "items/" + id);
   }
 
   // ====== МОДАЛЬНЫЕ ОКНА ======
@@ -270,6 +203,7 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChang
   try{
     const fbApp = initializeApp(CONFIG.FIREBASE_CONFIG);
     fbAuth = getAuth(fbApp);
+    db = getDatabase(fbApp);
   }catch(e){
     console.error("Firebase init failed", e);
   }
@@ -280,12 +214,6 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChang
       if(user && user.email === CONFIG.OWNER_EMAIL){
         state.isOwner = true;
         state.ownerEmail = user.email;
-        localStorage.setItem(LS.wasOwner, "1");
-        if(!state.masterKey){
-          openMasterKeyModal();
-        }else{
-          renderAll();
-        }
       }else{
         if(user){
           // вошёл, но этот email не владелец
@@ -294,8 +222,8 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChang
         }
         state.isOwner = false;
         state.ownerEmail = null;
-        renderAll();
       }
+      renderAll();
     });
   }
 
@@ -308,46 +236,7 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChang
   }
 
   function ownerLogout(){
-    localStorage.removeItem(LS.wasOwner);
     if(fbAuth) signOut(fbAuth);
-  }
-
-  function openMasterKeyModal(){
-    openModal(`
-      <h3>JSONBin Master Key</h3>
-      <p style="font-size:.88rem;color:var(--muted);margin-top:-6px;">
-        Нужен один раз, чтобы создать/сохранять список. Возьмите его в личном кабинете на
-        <a href="https://jsonbin.io" target="_blank" rel="noopener">jsonbin.io</a> (X-Master-Key).
-        Ключ хранится только в этом браузере (localStorage).
-      </p>
-      <div class="field">
-        <label>Master Key</label>
-        <input type="password" id="masterKeyInput" autocomplete="off">
-      </div>
-      <div class="error-text" id="masterKeyError"></div>
-      <div class="modal-actions">
-        <button class="secondary" id="cancelMasterKey">Отмена</button>
-        <button id="submitMasterKey">Сохранить</button>
-      </div>
-    `, overlay => {
-      const input = overlay.querySelector("#masterKeyInput");
-      input.focus();
-      overlay.querySelector("#submitMasterKey").addEventListener("click", () => {
-        const val = input.value.trim();
-        if(!val){
-          overlay.querySelector("#masterKeyError").textContent = "Введите ключ";
-          return;
-        }
-        state.masterKey = val;
-        localStorage.setItem(LS.masterKey, val);
-        closeModal();
-        renderAll();
-      });
-      overlay.querySelector("#cancelMasterKey").addEventListener("click", () => {
-        closeModal();
-        renderAll();
-      });
-    });
   }
 
   function openItemModal(existingItem){
@@ -390,9 +279,8 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChang
         overlay.querySelector("#deleteItemBtn").addEventListener("click", async () => {
           if(!confirm("Удалить этот подарок из списка?")) return;
           await withLoadingButton(overlay.querySelector("#deleteItemBtn"), async () => {
-            await mutateItems(items => items.filter(i => i.id !== item.id));
+            await remove(itemRef(item.id));
             closeModal();
-            renderAll();
             showToast("Подарок удалён");
           });
         });
@@ -400,9 +288,8 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChang
         if(unreserveBtn){
           unreserveBtn.addEventListener("click", async () => {
             await withLoadingButton(unreserveBtn, async () => {
-              await mutateItems(items => items.map(i => i.id === item.id ? {...i, reservedBy:""} : i));
+              await update(itemRef(item.id), { reservedBy: "" });
               closeModal();
-              renderAll();
               showToast("Бронь снята");
             });
           });
@@ -425,15 +312,13 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChang
         const saveBtn = overlay.querySelector("#saveItem");
         await withLoadingButton(saveBtn, async () => {
           try{
-            await ensureBinExists();
             if(isEdit){
-              await mutateItems(items => items.map(i => i.id === item.id ? {...i, ...data} : i));
+              await update(itemRef(item.id), data);
             }else{
-              const newItem = { id: uid(), reservedBy: "", ...data };
-              await mutateItems(items => [...items, newItem]);
+              const newItem = { reservedBy: "", ...data };
+              await set(itemRef(uid()), newItem);
             }
             closeModal();
-            renderAll();
             showToast("Сохранено");
           }catch(e){
             overlay.querySelector("#itemError").textContent = e.message;
@@ -468,13 +353,10 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChang
         const btn = overlay.querySelector("#confirmReserve");
         await withLoadingButton(btn, async () => {
           try{
-            await mutateItems(items => items.map(i => {
-              if(i.id !== item.id) return i;
-              if(i.reservedBy) throw new Error("Этот подарок уже забронировали");
-              return {...i, reservedBy: name};
-            }));
+            const current = state.items.find(i => i.id === item.id);
+            if(current && current.reservedBy) throw new Error("Этот подарок уже забронировали");
+            await update(itemRef(item.id), { reservedBy: name });
             closeModal();
-            renderAll();
             showToast("Забронировано! Спасибо 🎉");
           }catch(e){
             overlay.querySelector("#reserveError").textContent = e.message;
@@ -511,9 +393,8 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChang
         }
         const btn = overlay.querySelector("#confirmCancelReserve");
         await withLoadingButton(btn, async () => {
-          await mutateItems(items => items.map(i => i.id === item.id ? {...i, reservedBy:""} : i));
+          await update(itemRef(item.id), { reservedBy: "" });
           closeModal();
-          renderAll();
           showToast("Бронь снята");
         });
       });
@@ -536,21 +417,9 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChang
     }
   }
 
-  // Создаёт bin при самом первом сохранении, если его ещё нет.
-  async function ensureBinExists(){
-    if(state.binId) return;
-    if(!state.masterKey){
-      throw new Error("Нет Master Key — войдите заново как владелец");
-    }
-    const id = await apiCreateBin(state.masterKey, { items: state.items });
-    state.binId = id;
-    setBinIdInUrl(id);
-  }
-
   // ====== РЕНДЕР ======
   function renderAll(){
     renderOwnerControls();
-    renderBanner();
     renderMain();
   }
 
@@ -560,11 +429,9 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChang
       el.innerHTML = `
         <span style="color:var(--muted);font-size:.82rem;">${escapeHtml(state.ownerEmail || "")}</span>
         <button class="secondary" id="btnAddItem">+ Добавить подарок</button>
-        <button class="ghost" id="btnChangeKey">Ключ JSONBin</button>
         <button class="ghost" id="btnLogout">Выйти</button>
       `;
       $("#btnAddItem").addEventListener("click", () => openItemModal(null));
-      $("#btnChangeKey").addEventListener("click", openMasterKeyModal);
       $("#btnLogout").addEventListener("click", ownerLogout);
     }else{
       el.innerHTML = `<button class="secondary" id="googleSignInBtn">Войти через Google</button>`;
@@ -572,50 +439,8 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChang
     }
   }
 
-  function renderBanner(){
-    const el = $("#banner");
-    if(state.isOwner && state.binId){
-      el.innerHTML = `
-        <div class="banner-box success">
-          <span>Ссылка для гостей:</span>
-          <code>${escapeHtml(guestLink())}</code>
-          <button class="secondary" id="copyLinkBtn">Копировать</button>
-        </div>
-      `;
-      $("#copyLinkBtn").addEventListener("click", async () => {
-        try{
-          await navigator.clipboard.writeText(guestLink());
-          showToast("Ссылка скопирована");
-        }catch(e){
-          showToast("Не удалось скопировать — скопируйте вручную", true);
-        }
-      });
-    }else{
-      el.innerHTML = "";
-    }
-  }
-
   function renderMain(){
     const el = $("#main");
-
-    if(!state.binId){
-      if(state.isOwner){
-        el.innerHTML = `
-          <div class="empty-state">
-            <h2>Список пока пуст</h2>
-            <p>Добавьте первый подарок — ссылка для гостей появится автоматически после сохранения.</p>
-          </div>
-        `;
-      }else{
-        el.innerHTML = `
-          <div class="empty-state">
-            <h2>Вишлист ещё не настроен</h2>
-            <p>Если вы владелец — войдите в правом верхнем углу, чтобы создать список.</p>
-          </div>
-        `;
-      }
-      return;
-    }
 
     if(state.loading){
       el.innerHTML = `<div class="spinner-row">Загрузка…</div>`;
@@ -623,7 +448,9 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChang
     }
 
     if(state.items.length === 0){
-      el.innerHTML = `<div class="empty-state"><h2>Список пуст</h2><p>Пока здесь ничего нет.</p></div>`;
+      el.innerHTML = state.isOwner
+        ? `<div class="empty-state"><h2>Список пока пуст</h2><p>Добавьте первый подарок кнопкой выше.</p></div>`
+        : `<div class="empty-state"><h2>Список пуст</h2><p>Пока здесь ничего нет.</p></div>`;
       return;
     }
 
@@ -677,29 +504,30 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChang
     return `<button class="full-btn reserveBtn">Забронировать</button>`;
   }
 
-  async function refreshList(){
-    state.loading = true;
-    renderMain();
-    try{
-      const data = await apiGetLatest(state.binId);
-      state.items = (data && data.items) || [];
-    }catch(e){
-      showToast(e.message, true);
-      state.items = [];
-    }finally{
+  // Живая подписка на список — при любом изменении (своём или чужом) экран обновляется сам.
+  function watchItems(){
+    if(!db){
       state.loading = false;
       renderAll();
+      return;
     }
+    onValue(ref(db, "items"), snap => {
+      const val = snap.val() || {};
+      state.items = Object.keys(val).map(id => ({ id, reservedBy: "", ...val[id] }));
+      state.loading = false;
+      renderAll();
+    }, err => {
+      showToast(err.message, true);
+      state.loading = false;
+      renderAll();
+    });
   }
 
   // ====== СТАРТ ======
-  async function init(){
-    state.binId = getBinIdFromUrl();
+  function init(){
     renderAll();
     initGoogleSignIn();
-    if(state.binId){
-      await refreshList();
-    }
+    watchItems();
   }
 
   init();
