@@ -233,7 +233,7 @@ async function fetchTitleOnlyFallback(url){
   if(!res.ok) throw new Error("код " + res.status);
   const text = await res.text();
   const match = text.match(/^Title:\s*(.+)$/m);
-  return { title: match ? cleanupTitle(match[1]) : "", image: "", price: "" };
+  return { title: match ? cleanupTitle(match[1]) : "", image: "", images: [], price: "" };
 }
 
 async function fetchLinkPreview(url){
@@ -255,23 +255,41 @@ async function fetchLinkPreview(url){
   };
 
   const title = cleanupTitle(getMeta("og:title", "twitter:title") || (doc.querySelector("title")?.textContent || "").trim());
-  let image = getMeta("og:image", "og:image:secure_url", "twitter:image");
 
-  if(!image){
-    // Amazon не кладёт og:image на страницы товаров — картинка лежит в атрибутах
-    // главного изображения (data-old-hires — уже готовая ссылка на полный размер).
+  // Сайт может отдавать несколько og:image (обычно то же самое фото в разных размерах,
+  // но иногда — правда разные ракурсы товара).
+  let images = Array.from(doc.querySelectorAll('meta[property="og:image"], meta[property="og:image:secure_url"], meta[name="twitter:image"]'))
+    .map(el => (el.getAttribute("content") || "").trim())
+    .filter(Boolean);
+  images = Array.from(new Set(images));
+
+  if(images.length === 0){
+    // Amazon не кладёт og:image на страницы товаров — главная картинка лежит в атрибутах
+    // #landingImage (data-old-hires — уже готовая ссылка на полный размер), а остальные
+    // ракурсы — в мини-превью галереи снизу (их приходится апскейлить вручную).
     const landing = doc.querySelector("#landingImage, #imgBlkFront");
     if(landing){
-      image = landing.getAttribute("data-old-hires") || "";
-      if(!image){
+      let main = landing.getAttribute("data-old-hires") || "";
+      if(!main){
         const dynamic = landing.getAttribute("data-a-dynamic-image");
         if(dynamic){
-          try{ image = Object.keys(JSON.parse(dynamic))[0] || ""; }catch(e){ /* не JSON — пропускаем */ }
+          try{ main = Object.keys(JSON.parse(dynamic))[0] || ""; }catch(e){ /* не JSON — пропускаем */ }
         }
       }
-      if(!image) image = landing.getAttribute("src") || "";
+      if(!main) main = landing.getAttribute("src") || "";
+      if(main) images.push(main);
     }
+    doc.querySelectorAll("#altImages img").forEach(thumb => {
+      const src = thumb.getAttribute("src") || "";
+      const match = src.match(/^(https?:\/\/[^"']+\/images\/I\/[\w+-]+)\._[^."']+_\.(jpg|jpeg|png|gif)$/i);
+      if(match){
+        const upgraded = `${match[1]}._AC_SL1000_.${match[2]}`;
+        if(!images.includes(upgraded)) images.push(upgraded);
+      }
+    });
   }
+
+  const image = images[0] || "";
 
   let price = getMeta("product:price:amount", "og:price:amount");
   const currency = getMeta("product:price:currency", "og:price:currency");
@@ -301,16 +319,21 @@ async function fetchLinkPreview(url){
     price = `${price} ${currency}`;
   }
 
-  return { title, image, price };
+  return { title, image, images, price };
 }
 
 // ====== МОДАЛЬНЫЕ ОКНА ======
-function openModal(html, onMount){
+// closeOnBackdrop только для окон без ввода данных (просмотр карточки) — формы специально
+// не закрываются по клику мимо, иначе случайный клик стирает то, что уже успели набрать.
+function openModal(html, onMount, opts){
   closeModal();
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
   overlay.id = "activeModal";
-  overlay.innerHTML = `<div class="modal">${html}</div>`;
+  overlay.innerHTML = `<div class="modal${opts && opts.wide ? " modal-wide" : ""}">${html}</div>`;
+  if(opts && opts.closeOnBackdrop){
+    overlay.addEventListener("click", e => { if(e.target === overlay) closeModal(); });
+  }
   document.getElementById("modalRoot").appendChild(overlay);
   if(onMount) onMount(overlay);
 }
@@ -368,7 +391,8 @@ function ownerLogout(){
 
 function openItemModal(existingItem){
   const isEdit = !!existingItem;
-  const item = existingItem || { title:"", note:"", link:"", image:"" };
+  const item = existingItem || { title:"", note:"", link:"", image:"", images:[] };
+  const existingImages = (item.images && item.images.length) ? item.images : (item.image ? [item.image] : []);
   const parsedPrice = isEdit ? parsePriceValue(item) : null;
   const initialAmount = parsedPrice ? parsedPrice.amount : "";
   const initialCurrency = parsedPrice ? parsedPrice.currency : "AMD";
@@ -399,8 +423,9 @@ function openItemModal(existingItem){
       </div>
     </div>
     <div class="field">
-      <label>Картинка (URL)</label>
-      <input type="text" id="fImage" value="${escapeHtml(item.image)}" placeholder="https://...">
+      <label>Картинки</label>
+      <textarea id="fImages" placeholder="https://...">${escapeHtml(existingImages.join("\n"))}</textarea>
+      <small>По одной ссылке на строку. Первая станет обложкой в списке.</small>
     </div>
     <div class="field">
       <label>Заметка</label>
@@ -428,7 +453,11 @@ function openItemModal(existingItem){
           const data = await fetchLinkPreview(url);
           const titleInput = overlay.querySelector("#fTitle");
           if(data.title && !titleInput.value.trim()) titleInput.value = data.title;
-          if(data.image) overlay.querySelector("#fImage").value = data.image;
+          if(data.images && data.images.length){
+            overlay.querySelector("#fImages").value = data.images.join("\n");
+          }else if(data.image){
+            overlay.querySelector("#fImages").value = data.image;
+          }
           if(data.price){
             const parsedScraped = parseLegacyPriceString(data.price);
             if(parsedScraped){
@@ -473,10 +502,13 @@ function openItemModal(existingItem){
         return;
       }
       const amountRaw = overlay.querySelector("#fPriceAmount").value.trim();
+      const imagesList = overlay.querySelector("#fImages").value
+        .split("\n").map(s => s.trim()).filter(Boolean);
       const data = {
         title,
         link: overlay.querySelector("#fLink").value.trim(),
-        image: overlay.querySelector("#fImage").value.trim(),
+        images: imagesList.length ? imagesList : null,
+        image: imagesList.length ? imagesList[0] : null,
         note: overlay.querySelector("#fNote").value.trim(),
         priceAmount: amountRaw ? Number(amountRaw) : null,
         priceCurrency: amountRaw ? overlay.querySelector("#fPriceCurrency").value : null,
@@ -576,6 +608,49 @@ function openCancelReserveModal(item){
   });
 }
 
+// Полная карточка товара по клику: галерея фото + вся информация без обрезки.
+function openDetailModal(item){
+  const images = (item.images && item.images.length) ? item.images : (item.image ? [item.image] : []);
+  const price = displayPrice(item);
+  const mainImageHtml = images.length
+    ? `<img id="detailMainImg" src="${escapeHtml(images[0])}" alt="" onerror="this.parentElement.innerHTML='🎁'">`
+    : "🎁";
+  const thumbsHtml = images.length > 1
+    ? `<div class="detail-thumbs">${images.map((src, i) => `<img src="${escapeHtml(src)}" class="detail-thumb${i === 0 ? " active" : ""}" data-src="${escapeHtml(src)}">`).join("")}</div>`
+    : "";
+
+  openModal(`
+    <div class="detail-main-img">${mainImageHtml}</div>
+    ${thumbsHtml}
+    <h3>${escapeHtml(item.title)}</h3>
+    ${price ? `<div class="card-price" style="font-size:1.15rem;margin-bottom:10px;">${escapeHtml(price)}</div>` : ""}
+    ${item.note ? `<p class="card-note" style="white-space:pre-wrap;">${escapeHtml(item.note)}</p>` : ""}
+    ${item.link ? `<div class="card-link" style="margin:10px 0;"><a href="${escapeHtml(item.link)}" target="_blank" rel="noopener">Открыть ссылку →</a></div>` : ""}
+    <div class="modal-actions" id="detailActions"></div>
+  `, overlay => {
+    overlay.querySelectorAll(".detail-thumb").forEach(thumb => {
+      thumb.addEventListener("click", () => {
+        overlay.querySelector("#detailMainImg").src = thumb.dataset.src;
+        overlay.querySelectorAll(".detail-thumb").forEach(t => t.classList.remove("active"));
+        thumb.classList.add("active");
+      });
+    });
+
+    const actions = overlay.querySelector("#detailActions");
+    if(state.isOwner){
+      actions.innerHTML = `<button class="secondary" id="detailClose">Закрыть</button><button id="detailEdit">✎ Редактировать</button>`;
+      actions.querySelector("#detailEdit").addEventListener("click", () => openItemModal(item));
+    }else if(item.reservedBy){
+      actions.innerHTML = `<button class="secondary" id="detailClose">Закрыть</button><button class="ghost" id="detailCancel">не я / отменить</button>`;
+      actions.querySelector("#detailCancel").addEventListener("click", () => openCancelReserveModal(item));
+    }else{
+      actions.innerHTML = `<button class="secondary" id="detailClose">Закрыть</button><button id="detailReserve">Хочу подарить</button>`;
+      actions.querySelector("#detailReserve").addEventListener("click", () => openReserveModal(item));
+    }
+    actions.querySelector("#detailClose").addEventListener("click", closeModal);
+  }, { closeOnBackdrop: true, wide: true });
+}
+
 async function withLoadingButton(btn, fn){
   const original = btn.textContent;
   btn.disabled = true;
@@ -640,6 +715,10 @@ function renderMain(){
   state.items.forEach(item => {
     const card = el.querySelector(`[data-id="${item.id}"]`);
     if(!card) return;
+    card.addEventListener("click", e => {
+      if(e.target.closest("button, a")) return; // у кнопок и ссылок своё поведение
+      openDetailModal(item);
+    });
     if(state.isOwner){
       card.querySelector(".editBtn")?.addEventListener("click", () => openItemModal(item));
     }else{
