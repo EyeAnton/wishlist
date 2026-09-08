@@ -409,7 +409,7 @@ function openItemModal(existingItem){
     <div class="error-text" id="itemError"></div>
     <div class="modal-actions">
       ${isEdit ? '<button class="danger left" id="deleteItemBtn">Удалить</button>' : ""}
-      ${isEdit && item.reservedBy ? '<button class="secondary" id="unreserveBtn">Снять бронь</button>' : ""}
+      ${isEdit && item.reservedBy ? '<button class="secondary" id="unreserveBtn">Снять отметку «дарю»</button>' : ""}
       <button class="secondary" id="cancelItem">Отмена</button>
       <button id="saveItem">Сохранить</button>
     </div>
@@ -460,7 +460,7 @@ function openItemModal(existingItem){
           await withLoadingButton(unreserveBtn, async () => {
             await update(itemRef(item.id), { reservedBy: "" });
             closeModal();
-            showToast("Бронь снята");
+            showToast("Отметка снята");
           });
         });
       }
@@ -504,16 +504,16 @@ function openItemModal(existingItem){
 
 function openReserveModal(item){
   openModal(`
-    <h3>Забронировать «${escapeHtml(item.title)}»</h3>
+    <h3>Хочу подарить «${escapeHtml(item.title)}»</h3>
     <div class="field">
       <label>Ваше имя</label>
       <input type="text" id="reserveName" placeholder="Например, Анна">
-      <small>Никому не покажем — понадобится только чтобы снять бронь, если передумаете.</small>
+      <small>Никому не покажем — понадобится только чтобы отменить, если передумаете.</small>
     </div>
     <div class="error-text" id="reserveError"></div>
     <div class="modal-actions">
       <button class="secondary" id="cancelReserve">Отмена</button>
-      <button id="confirmReserve">Забронировать</button>
+      <button id="confirmReserve">Хочу подарить</button>
     </div>
   `, overlay => {
     const input = overlay.querySelector("#reserveName");
@@ -529,10 +529,10 @@ function openReserveModal(item){
       await withLoadingButton(btn, async () => {
         try{
           const current = state.items.find(i => i.id === item.id);
-          if(current && current.reservedBy) throw new Error("Этот подарок уже забронировали");
+          if(current && current.reservedBy) throw new Error("Этот подарок уже хотят подарить");
           await update(itemRef(item.id), { reservedBy: name });
           closeModal();
-          showToast("Забронировано! Спасибо 🎉");
+          showToast("Записали! Спасибо 🎉");
         }catch(e){
           overlay.querySelector("#reserveError").textContent = e.message;
         }
@@ -545,8 +545,8 @@ function openReserveModal(item){
 
 function openCancelReserveModal(item){
   openModal(`
-    <h3>Отменить бронь «${escapeHtml(item.title)}»</h3>
-    <p style="font-size:.88rem;color:var(--muted);margin-top:-6px;">Введите имя, на которое бронировали, чтобы снять бронь.</p>
+    <h3>Передумали дарить «${escapeHtml(item.title)}»?</h3>
+    <p style="font-size:.88rem;color:var(--muted);margin-top:-6px;">Введите имя, которое указали, чтобы отменить.</p>
     <div class="field">
       <label>Имя</label>
       <input type="text" id="cancelName">
@@ -554,7 +554,7 @@ function openCancelReserveModal(item){
     <div class="error-text" id="cancelError"></div>
     <div class="modal-actions">
       <button class="secondary" id="cancelCancelReserve">Назад</button>
-      <button class="danger" id="confirmCancelReserve">Снять бронь</button>
+      <button class="danger" id="confirmCancelReserve">Отменить</button>
     </div>
   `, overlay => {
     const input = overlay.querySelector("#cancelName");
@@ -570,7 +570,7 @@ function openCancelReserveModal(item){
       await withLoadingButton(btn, async () => {
         await update(itemRef(item.id), { reservedBy: "" });
         closeModal();
-        showToast("Бронь снята");
+        showToast("Отменено");
       });
     });
   });
@@ -674,18 +674,18 @@ function renderCard(item){
 function renderCardFooter(item){
   if(state.isOwner){
     return item.reservedBy
-      ? `<span class="reserved-badge">🎗 Забронировано: ${escapeHtml(item.reservedBy)}</span>`
+      ? `<span class="reserved-badge">🎁 Хотят подарить: ${escapeHtml(item.reservedBy)}</span>`
       : `<span style="color:var(--muted);font-size:.85rem;">Свободно</span>`;
   }
   if(item.reservedBy){
-    // Имя не показываем — его же нужно ввести, чтобы снять бронь. Покажи мы его тут,
-    // любой гость мог бы подсмотреть и отменить чужую бронь.
+    // Имя не показываем — его же нужно ввести, чтобы отменить. Покажи мы его тут,
+    // любой гость мог бы подсмотреть и отменить чужую отметку.
     return `
-      <span class="reserved-badge">🎗 Забронировано</span>
+      <span class="reserved-badge">🎁 Уже дарят</span>
       <button class="ghost cancelReserveBtn" style="font-size:.78rem;">не я / отменить</button>
     `;
   }
-  return `<button class="full-btn reserveBtn">Забронировать</button>`;
+  return `<button class="full-btn reserveBtn">Хочу подарить</button>`;
 }
 
 // Живая подписка на список — при любом изменении (своём или чужом) экран обновляется сам.
