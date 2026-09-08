@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Вишлист</title>
+<title>Вишлист · Админ</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎁</text></svg>">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div id="app">
   <header class="topbar">
-    <h1>🎁 Вишлист</h1>
+    <h1>🎁 Вишлист · Админ</h1>
     <div class="header-controls">
       <select id="currencySelect" title="Валюта отображения">
         <option value="original">Как указано</option>
@@ -19,6 +19,7 @@
         <option value="AMD">AMD</option>
       </select>
       <button class="ghost icon-btn" id="themeToggle" title="Переключить тему"></button>
+      <div class="owner-controls" id="ownerControls"></div>
     </div>
   </header>
   <main id="main"></main>
@@ -27,7 +28,7 @@
 
 <script type="module">
   import { initApp } from './app.js';
-  initApp({ isAdmin: false });
+  initApp({ isAdmin: true });
 </script>
 </body>
 </html>
