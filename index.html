@@ -310,7 +310,6 @@ import { getDatabase, ref, set, update, remove, onValue } from 'https://www.gsta
     overlay.className = "modal-overlay";
     overlay.id = "activeModal";
     overlay.innerHTML = `<div class="modal">${html}</div>`;
-    overlay.addEventListener("click", e => { if(e.target === overlay) closeModal(); });
     document.getElementById("modalRoot").appendChild(overlay);
     if(onMount) onMount(overlay);
   }
