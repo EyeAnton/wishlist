@@ -507,7 +507,8 @@ function openReserveModal(item){
     <h3>Забронировать «${escapeHtml(item.title)}»</h3>
     <div class="field">
       <label>Ваше имя</label>
-      <input type="text" id="reserveName" placeholder="Как вас представить дарителям?">
+      <input type="text" id="reserveName" placeholder="Например, Анна">
+      <small>Никому не покажем — понадобится только чтобы снять бронь, если передумаете.</small>
     </div>
     <div class="error-text" id="reserveError"></div>
     <div class="modal-actions">
@@ -677,8 +678,10 @@ function renderCardFooter(item){
       : `<span style="color:var(--muted);font-size:.85rem;">Свободно</span>`;
   }
   if(item.reservedBy){
+    // Имя не показываем — его же нужно ввести, чтобы снять бронь. Покажи мы его тут,
+    // любой гость мог бы подсмотреть и отменить чужую бронь.
     return `
-      <span class="reserved-badge">🎗 Забронировано: ${escapeHtml(item.reservedBy)}</span>
+      <span class="reserved-badge">🎗 Забронировано</span>
       <button class="ghost cancelReserveBtn" style="font-size:.78rem;">не я / отменить</button>
     `;
   }
