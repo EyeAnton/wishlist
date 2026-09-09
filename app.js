@@ -39,7 +39,19 @@ const state = {
   ownerEmail: null,
   loading: true,
   viewCurrency: localStorage.getItem(LS.viewCurrency) || "original",
+  sortBy: "default", // "default" | "price_asc" | "price_desc"
+  excludedCategories: new Set(), // снятые галочки в фильтре категорий
 };
+
+const NO_CATEGORY = "Без категории";
+
+function categoryOf(item){
+  return (item.category && item.category.trim()) ? item.category.trim() : NO_CATEGORY;
+}
+
+function getAllCategories(){
+  return Array.from(new Set(state.items.map(categoryOf))).sort((a, b) => a.localeCompare(b, "ru"));
+}
 
 // ====== УТИЛИТЫ ======
 const $ = sel => document.querySelector(sel);
@@ -164,6 +176,16 @@ async function loadRates(){
 function convertAmount(amount, from, to){
   if(!RATES || !RATES[from] || !RATES[to]) return null;
   return amount / RATES[from] * RATES[to];
+}
+
+// Для сортировки по цене приводим всё к USD, чтобы честно сравнивать разные валюты.
+// Если курсы ещё не загрузились — сравниваем как есть (лучше, чем ничего).
+function priceForSort(item){
+  const parsed = parsePriceValue(item);
+  if(!parsed) return null;
+  if(parsed.currency === "USD") return parsed.amount;
+  const converted = convertAmount(parsed.amount, parsed.currency, "USD");
+  return converted != null ? converted : parsed.amount;
 }
 
 function formatMoney(amount, currency){
@@ -452,12 +474,18 @@ function openItemModal(existingItem){
   const parsedPrice = isEdit ? parsePriceValue(item) : null;
   const initialAmount = parsedPrice ? parsedPrice.amount : "";
   const initialCurrency = parsedPrice ? parsedPrice.currency : "AMD";
+  const existingCategories = getAllCategories().filter(c => c !== NO_CATEGORY);
 
   openModal(`
     <h3>${isEdit ? "Редактировать подарок" : "Добавить подарок"}</h3>
     <div class="field">
       <label>Название *</label>
       <input type="text" id="fTitle" value="${escapeHtml(item.title)}">
+    </div>
+    <div class="field">
+      <label>Категория</label>
+      <input type="text" id="fCategory" list="categoryOptions" value="${escapeHtml(item.category || "")}" placeholder="например, Электроника">
+      <datalist id="categoryOptions">${existingCategories.map(c => `<option value="${escapeHtml(c)}">`).join("")}</datalist>
     </div>
     <div class="field">
       <label>Цена</label>
@@ -562,6 +590,7 @@ function openItemModal(existingItem){
         .split("\n").map(s => s.trim()).filter(Boolean);
       const data = {
         title,
+        category: overlay.querySelector("#fCategory").value.trim() || null,
         link: overlay.querySelector("#fLink").value.trim(),
         images: imagesList.length ? imagesList : null,
         image: imagesList.length ? imagesList[0] : null,
@@ -782,9 +811,60 @@ function renderMain(){
     return;
   }
 
-  el.innerHTML = `<div class="grid">${state.items.map(renderCard).join("")}</div>`;
+  const categories = getAllCategories();
+  let visibleItems = state.items.filter(item => !state.excludedCategories.has(categoryOf(item)));
 
-  state.items.forEach(item => {
+  if(state.sortBy === "price_asc" || state.sortBy === "price_desc"){
+    const dir = state.sortBy === "price_asc" ? 1 : -1;
+    visibleItems = visibleItems.slice().sort((a, b) => {
+      const pa = priceForSort(a), pb = priceForSort(b);
+      if(pa == null && pb == null) return 0;
+      if(pa == null) return 1;  // без цены — в конец списка
+      if(pb == null) return -1;
+      return (pa - pb) * dir;
+    });
+  }
+
+  const filtersBar = `
+    <div class="filters-bar">
+      <div class="filter-categories">
+        ${categories.map(cat => `
+          <label class="filter-chip">
+            <input type="checkbox" class="categoryFilterCheckbox" value="${escapeHtml(cat)}" ${state.excludedCategories.has(cat) ? "" : "checked"}>
+            ${escapeHtml(cat)}
+          </label>
+        `).join("")}
+      </div>
+      <select id="sortSelect">
+        <option value="default"${state.sortBy === "default" ? " selected" : ""}>Порядок: по умолчанию</option>
+        <option value="price_asc"${state.sortBy === "price_asc" ? " selected" : ""}>Цена: сначала дешёвые</option>
+        <option value="price_desc"${state.sortBy === "price_desc" ? " selected" : ""}>Цена: сначала дорогие</option>
+      </select>
+    </div>
+  `;
+
+  const list = visibleItems.length
+    ? `<div class="grid">${visibleItems.map(renderCard).join("")}</div>`
+    : `<div class="empty-state"><h2>Ничего не найдено</h2><p>Попробуйте включить другие категории.</p></div>`;
+
+  el.innerHTML = filtersBar + list;
+
+  el.querySelectorAll(".categoryFilterCheckbox").forEach(cb => {
+    cb.addEventListener("change", () => {
+      if(cb.checked) state.excludedCategories.delete(cb.value);
+      else state.excludedCategories.add(cb.value);
+      renderMain();
+    });
+  });
+  const sortSelect = el.querySelector("#sortSelect");
+  if(sortSelect){
+    sortSelect.addEventListener("change", () => {
+      state.sortBy = sortSelect.value;
+      renderMain();
+    });
+  }
+
+  visibleItems.forEach(item => {
     const card = el.querySelector(`[data-id="${item.id}"]`);
     if(!card) return;
     card.addEventListener("click", e => {
@@ -821,10 +901,11 @@ function renderCard(item){
       ${state.isOwner ? `<div class="owner-actions"><button class="secondary editBtn">✎</button></div>` : ""}
       <div class="card-img">${img}</div>
       <div class="card-body">
-        <p class="card-title">${escapeHtml(item.title)}</p>
+        <p class="card-title">${item.link
+          ? `<a href="${escapeHtml(item.link)}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a>`
+          : escapeHtml(item.title)}</p>
         ${price ? `<div class="card-price">${escapeHtml(price)}</div>` : ""}
         ${item.note ? `<p class="card-note">${escapeHtml(item.note)}</p>` : ""}
-        ${item.link ? `<div class="card-link"><a href="${escapeHtml(item.link)}" target="_blank" rel="noopener">Открыть ссылку →</a></div>` : ""}
         <div class="card-footer">
           ${renderCardFooter(item)}
         </div>
