@@ -4,7 +4,8 @@ import { getDatabase, ref, set, update, remove, onValue } from 'https://www.gsta
 
 // ====== НАСТРОЙКИ (можно менять) ======
 const CONFIG = {
-  OWNER_EMAIL: "leritosha@gmail.com", // только этот Google-аккаунт получает права владельца
+  OWNER_EMAIL: "leritosha@gmail.com", // только этот Google-аккаунт получает права владельца (без имён дарителей — сюрприз)
+  HELPER_EMAIL: "leritosha13@gmail.com", // видит, кто что дарит, но не может редактировать список
   // Отдельный Firebase-проект "wishlist" (console.firebase.google.com) — вход и хранение данных,
   // те же принципы, что и в leritonmap: вход через Google, доступ владельца по email,
   // правила Realtime Database ограничивают запись гостей только полем reservedBy.
@@ -29,7 +30,8 @@ let IS_ADMIN = false;
 
 const state = {
   items: [],
-  isOwner: false,
+  isOwner: false,      // права на добавление/редактирование/удаление; имён дарителей не видит
+  canSeeNames: false,  // хелпер (жена) — видит, кто что дарит, но не может менять список
   ownerEmail: null,
   loading: true,
   viewCurrency: localStorage.getItem(LS.viewCurrency) || "original",
@@ -388,14 +390,20 @@ function initGoogleSignIn(){
   onAuthStateChanged(fbAuth, user => {
     if(user && user.email === CONFIG.OWNER_EMAIL){
       state.isOwner = true;
+      state.canSeeNames = false;
+      state.ownerEmail = user.email;
+    }else if(user && user.email === CONFIG.HELPER_EMAIL){
+      state.isOwner = false;
+      state.canSeeNames = true;
       state.ownerEmail = user.email;
     }else{
       if(user){
-        // вошёл, но этот email не владелец
-        showToast("У аккаунта " + user.email + " нет прав владельца", true);
+        // вошёл, но этот email не в списке допущенных
+        showToast("У аккаунта " + user.email + " нет доступа", true);
         signOut(fbAuth);
       }
       state.isOwner = false;
+      state.canSeeNames = false;
       state.ownerEmail = null;
     }
     renderAll();
@@ -644,11 +652,18 @@ function openDetailModal(item){
     ? `<div class="detail-thumbs">${images.map((src, i) => `<img src="${escapeHtml(src)}" class="detail-thumb${i === 0 ? " active" : ""}" data-src="${escapeHtml(src)}">`).join("")}</div>`
     : "";
 
+  const reservedLine = (item.reservedBy && (state.isOwner || state.canSeeNames))
+    ? `<div class="reserved-badge" style="display:inline-flex;margin-bottom:10px;">${
+        state.canSeeNames ? `🎁 Хотят подарить: ${escapeHtml(item.reservedBy)}` : "🎁 Уже дарят"
+      }</div>`
+    : "";
+
   openModal(`
     <div class="detail-main-img">${mainImageHtml}</div>
     ${thumbsHtml}
     <h3>${escapeHtml(item.title)}</h3>
     ${price ? `<div class="card-price" style="font-size:1.15rem;margin-bottom:10px;">${escapeHtml(price)}</div>` : ""}
+    ${reservedLine}
     ${item.note ? `<p class="card-note" style="white-space:pre-wrap;">${escapeHtml(item.note)}</p>` : ""}
     ${item.link ? `<div class="card-link" style="margin:10px 0;"><a href="${escapeHtml(item.link)}" target="_blank" rel="noopener">Открыть ссылку →</a></div>` : ""}
     <div class="modal-actions" id="detailActions"></div>
@@ -665,6 +680,8 @@ function openDetailModal(item){
     if(state.isOwner){
       actions.innerHTML = `<button class="secondary" id="detailClose">Закрыть</button><button id="detailEdit">✎ Редактировать</button>`;
       actions.querySelector("#detailEdit").addEventListener("click", () => openItemModal(item));
+    }else if(state.canSeeNames){
+      actions.innerHTML = `<button class="secondary" id="detailClose">Закрыть</button>`;
     }else if(item.reservedBy){
       actions.innerHTML = `<button class="secondary" id="detailClose">Закрыть</button><button class="ghost" id="detailCancel">не я / отменить</button>`;
       actions.querySelector("#detailCancel").addEventListener("click", () => openCancelReserveModal(item));
@@ -713,6 +730,12 @@ function renderOwnerControls(){
     `;
     $("#btnAddItem").addEventListener("click", () => openItemModal(null));
     $("#btnLogout").addEventListener("click", ownerLogout);
+  }else if(state.canSeeNames){
+    el.innerHTML = `
+      <span style="color:var(--muted);font-size:.82rem;">${escapeHtml(state.ownerEmail || "")} · только просмотр</span>
+      <button class="ghost" id="btnLogout">Выйти</button>
+    `;
+    $("#btnLogout").addEventListener("click", ownerLogout);
   }else{
     el.innerHTML = `<button class="secondary" id="googleSignInBtn">Войти через Google</button>`;
     $("#googleSignInBtn").addEventListener("click", signInOwner);
@@ -746,7 +769,7 @@ function renderMain(){
     });
     if(state.isOwner){
       card.querySelector(".editBtn")?.addEventListener("click", () => openItemModal(item));
-    }else{
+    }else if(!state.canSeeNames){
       card.querySelector(".reserveBtn")?.addEventListener("click", () => openReserveModal(item));
       card.querySelector(".cancelReserveBtn")?.addEventListener("click", () => openCancelReserveModal(item));
     }
@@ -776,13 +799,16 @@ function renderCard(item){
 }
 
 function renderCardFooter(item){
-  if(state.isOwner){
-    return item.reservedBy
+  // Владелец (получатель подарков) сюрприз не видит — только факт брони, без имени.
+  // Хелпер (жена) видит имя, чтобы помогать координировать подарки, но список не редактирует.
+  if(state.isOwner || state.canSeeNames){
+    if(!item.reservedBy) return `<span style="color:var(--muted);font-size:.85rem;">Свободно</span>`;
+    return state.canSeeNames
       ? `<span class="reserved-badge">🎁 Хотят подарить: ${escapeHtml(item.reservedBy)}</span>`
-      : `<span style="color:var(--muted);font-size:.85rem;">Свободно</span>`;
+      : `<span class="reserved-badge">🎁 Уже дарят</span>`;
   }
   if(item.reservedBy){
-    // Имя не показываем — его же нужно ввести, чтобы отменить. Покажи мы его тут,
+    // Имя не показываем гостям — его же нужно ввести, чтобы отменить. Покажи мы его тут,
     // любой гость мог бы подсмотреть и отменить чужую отметку.
     return `
       <span class="reserved-badge">🎁 Уже дарят</span>
