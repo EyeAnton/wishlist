@@ -18,6 +18,10 @@ const CONFIG = {
     messagingSenderId: "193096293416",
     appId: "1:193096293416:web:ff4618fb4556da8ba6e91d",
   },
+  CONTACTS: [
+    { name: "Антон", url: "https://t.me/eyeanton" },
+    { name: "Лера", url: "https://t.me/egorova_leriya" },
+  ],
 };
 
 const LS = {
@@ -666,6 +670,7 @@ function openDetailModal(item){
     ${reservedLine}
     ${item.note ? `<p class="card-note" style="white-space:pre-wrap;">${escapeHtml(item.note)}</p>` : ""}
     ${item.link ? `<div class="card-link" style="margin:10px 0;"><a href="${escapeHtml(item.link)}" target="_blank" rel="noopener">Открыть ссылку →</a></div>` : ""}
+    ${renderContacts()}
     <div class="modal-actions" id="detailActions"></div>
   `, overlay => {
     overlay.querySelectorAll(".detail-thumb").forEach(thumb => {
@@ -776,6 +781,15 @@ function renderMain(){
   });
 }
 
+// Мини-кнопки "написать в Telegram" — на случай вопросов про подарок или размер/цвет.
+function renderContacts(){
+  return `
+    <div class="card-contacts">
+      ${CONFIG.CONTACTS.map(c => `<a href="${escapeHtml(c.url)}" target="_blank" rel="noopener" class="contact-link">✈️ ${escapeHtml(c.name)}</a>`).join("")}
+    </div>
+  `;
+}
+
 function renderCard(item){
   const img = item.image
     ? `<img src="${escapeHtml(item.image)}" alt="" onerror="this.parentElement.innerHTML='🎁'">`
@@ -793,6 +807,7 @@ function renderCard(item){
         <div class="card-footer">
           ${renderCardFooter(item)}
         </div>
+        ${renderContacts()}
       </div>
     </div>
   `;

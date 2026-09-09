@@ -98,6 +98,9 @@ button:disabled{opacity:.55; cursor:not-allowed;}
 .card-link a{color:var(--accent-solid); font-size:.88rem; text-decoration:none;}
 .card-link a:hover{text-decoration:underline;}
 .card-footer{margin-top:auto; padding-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+.card-contacts{display:flex; gap:14px; margin-top:10px; padding-top:10px; border-top:1px solid var(--border);}
+.contact-link{font-size:.8rem; color:var(--muted); text-decoration:none; display:inline-flex; align-items:center; gap:4px;}
+.contact-link:hover{color:var(--accent-solid); text-decoration:underline;}
 .reserved-badge{
   background:var(--reserved-bg); color:var(--reserved-text); font-size:.8rem; padding:6px 10px; border-radius:8px; font-weight:600;
   display:flex; align-items:center; gap:6px; flex:1;
