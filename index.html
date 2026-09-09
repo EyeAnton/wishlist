@@ -9,21 +9,17 @@
 </head>
 <body>
 <div id="app">
+  <div class="countdown-hero" id="countdown"></div>
   <header class="topbar">
     <div>
       <h1><a href="admin.html" style="color:inherit;text-decoration:none;">🎁 Вишлист</a></h1>
-      <div class="countdown" id="countdown"></div>
     </div>
     <div class="header-controls">
-      <select id="currencySelect" title="Валюта отображения">
-        <option value="original">Как указано</option>
-        <option value="USD">USD $</option>
-        <option value="RUB">RUB ₽</option>
-        <option value="AMD">AMD</option>
-      </select>
+      <span class="theme-icon">☀️</span>
       <button class="theme-switch" id="themeToggle" role="switch" aria-checked="false" title="Переключить тему">
         <span class="theme-switch-knob"></span>
       </button>
+      <span class="theme-icon">🌙</span>
     </div>
   </header>
   <main id="main"></main>

@@ -54,11 +54,14 @@ header.topbar{
   margin-bottom:24px;
 }
 header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; gap:10px; color:var(--text);}
-.countdown{margin-top:4px; max-width:220px;}
-.countdown-label{font-size:.78rem; color:var(--muted); margin-bottom:4px;}
+.countdown-hero{max-width:480px; margin:0 auto 28px; text-align:center;}
+.countdown-hero .countdown-label{font-size:1.05rem; font-weight:600; color:var(--text); margin-bottom:8px;}
+.countdown-hero .countdown-bar{height:14px; border-radius:7px;}
 .countdown-bar{position:relative; height:8px; border-radius:4px; background:var(--input-bg); overflow:hidden; border:1px solid var(--border);}
-.countdown-bar-fill{height:100%; background:var(--accent-solid); border-radius:4px 0 0 4px; transition:width .3s;}
+.countdown-bar-fill{position:absolute; top:0; right:0; bottom:0; background:var(--accent-solid); border-radius:0 4px 4px 0; transition:width .3s;}
+.countdown-hero .countdown-bar-fill{border-radius:0 7px 7px 0;}
 .countdown-tick{position:absolute; top:0; bottom:0; width:1px; background:var(--bg1); opacity:.55;}
+.theme-icon{font-size:1.1rem; line-height:1;}
 
 /* тумблер темы: скруглённый прямоугольник + кружок, который едет по клику */
 .theme-switch{
@@ -103,7 +106,6 @@ button:disabled{opacity:.55; cursor:not-allowed;}
 .filter-categories{display:flex; flex-wrap:wrap; gap:12px; flex:1;}
 .filter-chip{display:inline-flex; align-items:center; gap:6px; font-size:.85rem; color:var(--text); cursor:pointer; user-select:none;}
 .filter-chip input{accent-color:var(--accent-solid); width:15px; height:15px; cursor:pointer; margin:0;}
-.filters-bar select{margin-left:auto;}
 .grid{
   display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:18px;
 }

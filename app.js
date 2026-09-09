@@ -123,8 +123,7 @@ function renderCountdown(){
   const dayMs = 1000 * 60 * 60 * 24;
   const totalDays = Math.round((target - start) / dayMs);
   const daysLeft = Math.round((target - today) / dayMs);
-  const passedDays = totalDays - daysLeft;
-  const pct = Math.min(100, Math.max(0, (passedDays / totalDays) * 100));
+  const pct = Math.min(100, Math.max(0, (daysLeft / totalDays) * 100));
 
   const ticks = Array.from({ length: totalDays - 1 }, (_, i) =>
     `<span class="countdown-tick" style="left:${((i + 1) / totalDays) * 100}%"></span>`
@@ -231,17 +230,6 @@ function displayPrice(item){
   const converted = convertAmount(parsed.amount, parsed.currency, target);
   if(converted == null) return formatMoney(parsed.amount, parsed.currency);
   return formatMoney(converted, target);
-}
-
-function initCurrencySelect(){
-  const sel = $("#currencySelect");
-  if(!sel) return;
-  sel.value = state.viewCurrency;
-  sel.addEventListener("change", () => {
-    state.viewCurrency = sel.value;
-    localStorage.setItem(LS.viewCurrency, state.viewCurrency);
-    renderAll();
-  });
 }
 
 // ====== ХРАНЕНИЕ (Firebase Realtime Database) ======
@@ -827,6 +815,11 @@ function renderMain(){
 
   const filtersBar = `
     <div class="filters-bar">
+      <select id="sortSelect">
+        <option value="default"${state.sortBy === "default" ? " selected" : ""}>Порядок: по умолчанию</option>
+        <option value="price_asc"${state.sortBy === "price_asc" ? " selected" : ""}>Цена: сначала дешёвые</option>
+        <option value="price_desc"${state.sortBy === "price_desc" ? " selected" : ""}>Цена: сначала дорогие</option>
+      </select>
       <div class="filter-categories">
         ${categories.map(cat => `
           <label class="filter-chip">
@@ -835,10 +828,11 @@ function renderMain(){
           </label>
         `).join("")}
       </div>
-      <select id="sortSelect">
-        <option value="default"${state.sortBy === "default" ? " selected" : ""}>Порядок: по умолчанию</option>
-        <option value="price_asc"${state.sortBy === "price_asc" ? " selected" : ""}>Цена: сначала дешёвые</option>
-        <option value="price_desc"${state.sortBy === "price_desc" ? " selected" : ""}>Цена: сначала дорогие</option>
+      <select id="currencySelect" title="Валюта отображения">
+        <option value="original"${state.viewCurrency === "original" ? " selected" : ""}>Как указано</option>
+        <option value="USD"${state.viewCurrency === "USD" ? " selected" : ""}>USD $</option>
+        <option value="RUB"${state.viewCurrency === "RUB" ? " selected" : ""}>RUB ₽</option>
+        <option value="AMD"${state.viewCurrency === "AMD" ? " selected" : ""}>AMD</option>
       </select>
     </div>
   `;
@@ -860,6 +854,14 @@ function renderMain(){
   if(sortSelect){
     sortSelect.addEventListener("change", () => {
       state.sortBy = sortSelect.value;
+      renderMain();
+    });
+  }
+  const currencySelect = el.querySelector("#currencySelect");
+  if(currencySelect){
+    currencySelect.addEventListener("change", () => {
+      state.viewCurrency = currencySelect.value;
+      localStorage.setItem(LS.viewCurrency, state.viewCurrency);
       renderMain();
     });
   }
@@ -959,7 +961,6 @@ export function initApp(opts){
   IS_ADMIN = !!(opts && opts.isAdmin);
   initTheme();
   initCountdown();
-  initCurrencySelect();
   initFirebase();
   renderAll();
   if(IS_ADMIN) initGoogleSignIn();
