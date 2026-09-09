@@ -84,6 +84,31 @@ function initTheme(){
   }
 }
 
+// ====== СЧЁТЧИК ДО 1 ОКТЯБРЯ ======
+function daysWord(n){
+  const mod10 = n % 10, mod100 = n % 100;
+  if(mod100 >= 11 && mod100 <= 14) return "дней";
+  if(mod10 === 1) return "день";
+  if(mod10 >= 2 && mod10 <= 4) return "дня";
+  return "дней";
+}
+
+function renderCountdown(){
+  const el = $("#countdown");
+  if(!el) return;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let target = new Date(now.getFullYear(), 9, 1); // месяцы с 0 — 9 это октябрь
+  if(target < today) target = new Date(now.getFullYear() + 1, 9, 1);
+  const days = Math.round((target - today) / (1000 * 60 * 60 * 24));
+  el.textContent = days === 0 ? "Сегодня 1 октября! 🎉" : `${days} ${daysWord(days)} до 1 октября`;
+}
+
+function initCountdown(){
+  renderCountdown();
+  setInterval(renderCountdown, 60 * 60 * 1000);
+}
+
 // ====== ВАЛЮТА ПРОСМОТРА (с конвертацией) ======
 const CURRENCY_SYMBOL = { USD: "$", RUB: "₽", AMD: "AMD" };
 let RATES = null; // сколько единиц валюты за 1 USD
@@ -790,6 +815,7 @@ function watchItems(){
 export function initApp(opts){
   IS_ADMIN = !!(opts && opts.isAdmin);
   initTheme();
+  initCountdown();
   initCurrencySelect();
   initFirebase();
   renderAll();

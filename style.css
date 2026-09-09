@@ -54,6 +54,7 @@ header.topbar{
   margin-bottom:24px;
 }
 header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; gap:10px; color:var(--text);}
+.countdown{font-size:.82rem; color:var(--muted); margin-top:2px;}
 .header-controls{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
 .owner-controls{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
 select{
