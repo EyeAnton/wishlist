@@ -54,7 +54,7 @@ header.topbar{
   margin-bottom:24px;
 }
 header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; gap:10px; color:var(--text);}
-.countdown-hero{max-width:480px; margin:0 auto 28px; text-align:center;}
+.countdown-hero{max-width:480px; margin:0 auto 24px; text-align:center;}
 .countdown-hero .countdown-label{font-size:1.05rem; font-weight:600; color:var(--text); margin-bottom:8px;}
 .countdown-hero .countdown-bar{height:14px; border-radius:7px;}
 .countdown-bar{position:relative; height:8px; border-radius:4px; background:var(--input-bg); overflow:hidden; border:1px solid var(--border);}
@@ -63,12 +63,18 @@ header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; g
 .countdown-tick{position:absolute; top:0; bottom:0; width:1px; background:var(--bg1); opacity:.55;}
 .theme-icon{font-size:1.1rem; line-height:1;}
 
-/* тумблер темы: скруглённый прямоугольник + кружок, который едет по клику */
+/* тумблер темы: скруглённый прямоугольник + кружок, который едет по клику.
+   Луна нарисована векторно и лежит в пустой части трека — тумблер-кружок
+   наезжает на неё, когда включается тёмная тема. */
 .theme-switch{
   position:relative; width:44px; height:24px; padding:0; flex:none;
   border-radius:12px; background:var(--border); border:none; cursor:pointer; transition:background .2s;
 }
 .theme-switch:hover{background:var(--border);}
+.theme-switch-moon{
+  position:absolute; top:50%; right:5px; width:13px; height:13px; transform:translateY(-50%);
+  color:var(--card); pointer-events:none;
+}
 .theme-switch-knob{
   position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:50%;
   background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.35); transition:transform .2s ease;

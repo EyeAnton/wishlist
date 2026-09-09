@@ -44,6 +44,7 @@ const state = {
 };
 
 const NO_CATEGORY = "Без категории";
+const FIXED_CATEGORIES = ["Девайсы", "Настолки", "Кофе", "Подписки"];
 
 function categoryOf(item){
   return (item.category && item.category.trim()) ? item.category.trim() : NO_CATEGORY;
@@ -462,7 +463,7 @@ function openItemModal(existingItem){
   const parsedPrice = isEdit ? parsePriceValue(item) : null;
   const initialAmount = parsedPrice ? parsedPrice.amount : "";
   const initialCurrency = parsedPrice ? parsedPrice.currency : "AMD";
-  const existingCategories = getAllCategories().filter(c => c !== NO_CATEGORY);
+  const categoryOptions = Array.from(new Set([...FIXED_CATEGORIES, ...getAllCategories().filter(c => c !== NO_CATEGORY)]));
 
   openModal(`
     <h3>${isEdit ? "Редактировать подарок" : "Добавить подарок"}</h3>
@@ -472,8 +473,10 @@ function openItemModal(existingItem){
     </div>
     <div class="field">
       <label>Категория</label>
-      <input type="text" id="fCategory" list="categoryOptions" value="${escapeHtml(item.category || "")}" placeholder="например, Электроника">
-      <datalist id="categoryOptions">${existingCategories.map(c => `<option value="${escapeHtml(c)}">`).join("")}</datalist>
+      <select id="fCategory">
+        <option value=""${item.category ? "" : " selected"}>Без категории</option>
+        ${categoryOptions.map(c => `<option value="${escapeHtml(c)}"${item.category === c ? " selected" : ""}>${escapeHtml(c)}</option>`).join("")}
+      </select>
     </div>
     <div class="field">
       <label>Цена</label>
