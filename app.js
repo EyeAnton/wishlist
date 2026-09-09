@@ -71,7 +71,7 @@ function applyTheme(theme){
   const btn = $("#themeToggle");
   if(btn){
     const isDark = theme === "dark" || (theme !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    btn.textContent = isDark ? "☀️" : "🌙";
+    btn.setAttribute("aria-checked", isDark ? "true" : "false");
   }
 }
 
@@ -106,8 +106,27 @@ function renderCountdown(){
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   let target = new Date(now.getFullYear(), 9, 1); // месяцы с 0 — 9 это октябрь
   if(target < today) target = new Date(now.getFullYear() + 1, 9, 1);
-  const days = Math.round((target - today) / (1000 * 60 * 60 * 24));
-  el.textContent = days === 0 ? "Сегодня 1 октября! 🎉" : `${days} ${daysWord(days)} до 1 октября`;
+  // Бар "заполняется" весь месяц перед целевой датой — с 1-го числа предыдущего месяца.
+  const start = new Date(target.getFullYear(), target.getMonth() - 1, 1);
+  const dayMs = 1000 * 60 * 60 * 24;
+  const totalDays = Math.round((target - start) / dayMs);
+  const daysLeft = Math.round((target - today) / dayMs);
+  const passedDays = totalDays - daysLeft;
+  const pct = Math.min(100, Math.max(0, (passedDays / totalDays) * 100));
+
+  const ticks = Array.from({ length: totalDays - 1 }, (_, i) =>
+    `<span class="countdown-tick" style="left:${((i + 1) / totalDays) * 100}%"></span>`
+  ).join("");
+
+  const label = daysLeft <= 0 ? "Сегодня 1 октября! 🎉" : `${daysLeft} ${daysWord(daysLeft)} до 1 октября`;
+
+  el.innerHTML = `
+    <div class="countdown-label">${label}</div>
+    <div class="countdown-bar" title="${escapeHtml(label)}">
+      <div class="countdown-bar-fill" style="width:${pct}%"></div>
+      ${ticks}
+    </div>
+  `;
 }
 
 function initCountdown(){
@@ -782,10 +801,12 @@ function renderMain(){
 }
 
 // Мини-кнопки "написать в Telegram" — на случай вопросов про подарок или размер/цвет.
+const TELEGRAM_ICON_SVG = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161c-.18 1.897-.962 6.502-1.359 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.831-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635.099-.002.321.023.465.14.121.098.153.23.169.324.016.093.036.306.02.472z"/></svg>`;
+
 function renderContacts(){
   return `
     <div class="card-contacts">
-      ${CONFIG.CONTACTS.map(c => `<a href="${escapeHtml(c.url)}" target="_blank" rel="noopener" class="contact-link">✈️ ${escapeHtml(c.name)}</a>`).join("")}
+      ${CONFIG.CONTACTS.map(c => `<a href="${escapeHtml(c.url)}" target="_blank" rel="noopener" class="contact-link">${TELEGRAM_ICON_SVG} ${escapeHtml(c.name)}</a>`).join("")}
     </div>
   `;
 }
