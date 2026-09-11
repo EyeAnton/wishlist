@@ -61,20 +61,21 @@ header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; g
 .countdown-bar-fill{position:absolute; top:0; right:0; bottom:0; background:var(--accent-solid); border-radius:0 4px 4px 0; transition:width .3s;}
 .countdown-hero .countdown-bar-fill{border-radius:0 7px 7px 0;}
 .countdown-tick{position:absolute; top:0; bottom:0; width:1px; background:var(--bg1); opacity:.55;}
-.theme-icon{font-size:1.1rem; line-height:1;}
 
 /* тумблер темы: скруглённый прямоугольник + кружок, который едет по клику.
-   Луна нарисована векторно и лежит в пустой части трека — тумблер-кружок
-   наезжает на неё, когда включается тёмная тема. */
+   Солнце и луна нарисованы векторно и лежат по краям трека — тумблер-кружок
+   наезжает на одну из них, скрывая её, в зависимости от текущей темы. */
 .theme-switch{
   position:relative; width:44px; height:24px; padding:0; flex:none;
   border-radius:12px; background:var(--border); border:none; cursor:pointer; transition:background .2s;
 }
 .theme-switch:hover{background:var(--border);}
-.theme-switch-moon{
-  position:absolute; top:50%; right:5px; width:13px; height:13px; transform:translateY(-50%);
+.theme-switch-sun, .theme-switch-moon{
+  position:absolute; top:50%; width:13px; height:13px; transform:translateY(-50%);
   color:var(--muted); pointer-events:none;
 }
+.theme-switch-sun{left:5px;}
+.theme-switch-moon{right:5px;}
 .theme-switch-knob{
   position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:50%;
   background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.35); transition:transform .2s ease;
@@ -109,9 +110,6 @@ button:disabled{opacity:.55; cursor:not-allowed;}
   display:flex; flex-wrap:wrap; gap:14px; align-items:center; margin-bottom:18px;
   padding:12px 16px; background:var(--card); border-radius:12px; box-shadow:var(--shadow);
 }
-.filter-categories{display:flex; flex-wrap:wrap; gap:12px; flex:1;}
-.filter-chip{display:inline-flex; align-items:center; gap:6px; font-size:.85rem; color:var(--text); cursor:pointer; user-select:none;}
-.filter-chip input{accent-color:var(--accent-solid); width:15px; height:15px; cursor:pointer; margin:0;}
 .grid{
   display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:18px;
 }

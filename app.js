@@ -40,7 +40,7 @@ const state = {
   loading: true,
   viewCurrency: localStorage.getItem(LS.viewCurrency) || "original",
   sortBy: "default", // "default" | "price_asc" | "price_desc"
-  excludedCategories: new Set(), // снятые галочки в фильтре категорий
+  categoryFilter: "", // "" — все категории, иначе показываем только эту
 };
 
 const NO_CATEGORY = "Без категории";
@@ -803,7 +803,9 @@ function renderMain(){
   }
 
   const categories = getAllCategories();
-  let visibleItems = state.items.filter(item => !state.excludedCategories.has(categoryOf(item)));
+  let visibleItems = state.categoryFilter
+    ? state.items.filter(item => categoryOf(item) === state.categoryFilter)
+    : state.items.slice();
 
   if(state.sortBy === "price_asc" || state.sortBy === "price_desc"){
     const dir = state.sortBy === "price_asc" ? 1 : -1;
@@ -823,36 +825,32 @@ function renderMain(){
         <option value="price_asc"${state.sortBy === "price_asc" ? " selected" : ""}>Цена: сначала дешёвые</option>
         <option value="price_desc"${state.sortBy === "price_desc" ? " selected" : ""}>Цена: сначала дорогие</option>
       </select>
-      <div class="filter-categories">
-        ${categories.map(cat => `
-          <label class="filter-chip">
-            <input type="checkbox" class="categoryFilterCheckbox" value="${escapeHtml(cat)}" ${state.excludedCategories.has(cat) ? "" : "checked"}>
-            ${escapeHtml(cat)}
-          </label>
-        `).join("")}
-      </div>
       <select id="currencySelect" title="Валюта отображения">
         <option value="original"${state.viewCurrency === "original" ? " selected" : ""}>Как указано</option>
         <option value="USD"${state.viewCurrency === "USD" ? " selected" : ""}>USD $</option>
         <option value="RUB"${state.viewCurrency === "RUB" ? " selected" : ""}>RUB ₽</option>
         <option value="AMD"${state.viewCurrency === "AMD" ? " selected" : ""}>AMD</option>
       </select>
+      <select id="categorySelect">
+        <option value=""${state.categoryFilter ? "" : " selected"}>Все категории</option>
+        ${categories.map(cat => `<option value="${escapeHtml(cat)}"${state.categoryFilter === cat ? " selected" : ""}>${escapeHtml(cat)}</option>`).join("")}
+      </select>
     </div>
   `;
 
   const list = visibleItems.length
     ? `<div class="grid">${visibleItems.map(renderCard).join("")}</div>`
-    : `<div class="empty-state"><h2>Ничего не найдено</h2><p>Попробуйте включить другие категории.</p></div>`;
+    : `<div class="empty-state"><h2>Ничего не найдено</h2><p>Попробуйте выбрать другую категорию.</p></div>`;
 
   el.innerHTML = filtersBar + list;
 
-  el.querySelectorAll(".categoryFilterCheckbox").forEach(cb => {
-    cb.addEventListener("change", () => {
-      if(cb.checked) state.excludedCategories.delete(cb.value);
-      else state.excludedCategories.add(cb.value);
+  const categorySelect = el.querySelector("#categorySelect");
+  if(categorySelect){
+    categorySelect.addEventListener("change", () => {
+      state.categoryFilter = categorySelect.value;
       renderMain();
     });
-  });
+  }
   const sortSelect = el.querySelector("#sortSelect");
   if(sortSelect){
     sortSelect.addEventListener("change", () => {
