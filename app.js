@@ -40,8 +40,17 @@ const state = {
   loading: true,
   viewCurrency: localStorage.getItem(LS.viewCurrency) || "original",
   sortBy: "default", // "default" | "price_asc" | "price_desc"
-  categoryFilter: "", // "" — все категории, иначе показываем только эту
+  excludedCategories: new Set(), // снятые галочки в выпадающем списке категорий
 };
+
+let categoryDropdownOpen = false;
+document.addEventListener("click", e => {
+  const open = document.querySelector(".dropdown-check[open]");
+  if(open && !open.contains(e.target)){
+    open.open = false;
+    categoryDropdownOpen = false;
+  }
+});
 
 const NO_CATEGORY = "Без категории";
 const FIXED_CATEGORIES = ["Девайсы", "Настолки", "Кофе", "Подписки"];
@@ -803,9 +812,7 @@ function renderMain(){
   }
 
   const categories = getAllCategories();
-  let visibleItems = state.categoryFilter
-    ? state.items.filter(item => categoryOf(item) === state.categoryFilter)
-    : state.items.slice();
+  let visibleItems = state.items.filter(item => !state.excludedCategories.has(categoryOf(item)));
 
   if(state.sortBy === "price_asc" || state.sortBy === "price_desc"){
     const dir = state.sortBy === "price_asc" ? 1 : -1;
@@ -818,6 +825,15 @@ function renderMain(){
     });
   }
 
+  const includedCount = categories.filter(c => !state.excludedCategories.has(c)).length;
+  const categoryLabel = includedCount === categories.length
+    ? "Все категории"
+    : includedCount === 0
+      ? "Категории не выбраны"
+      : includedCount === 1
+        ? categories.find(c => !state.excludedCategories.has(c))
+        : `Категории: ${includedCount}`;
+
   const filtersBar = `
     <div class="filters-bar">
       <select id="sortSelect">
@@ -825,32 +841,48 @@ function renderMain(){
         <option value="price_asc"${state.sortBy === "price_asc" ? " selected" : ""}>Цена: сначала дешёвые</option>
         <option value="price_desc"${state.sortBy === "price_desc" ? " selected" : ""}>Цена: сначала дорогие</option>
       </select>
+      <details class="dropdown-check" id="categoryDropdown"${categoryDropdownOpen ? " open" : ""}>
+        <summary class="dropdown-check-toggle">
+          <span>${escapeHtml(categoryLabel)}</span>
+          <svg class="dropdown-check-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="5 8 10 13 15 8"/></svg>
+        </summary>
+        <div class="dropdown-check-panel">
+          ${categories.map(cat => `
+            <label class="filter-chip">
+              <input type="checkbox" class="categoryFilterCheckbox" value="${escapeHtml(cat)}" ${state.excludedCategories.has(cat) ? "" : "checked"}>
+              ${escapeHtml(cat)}
+            </label>
+          `).join("")}
+        </div>
+      </details>
       <select id="currencySelect" title="Валюта отображения">
         <option value="original"${state.viewCurrency === "original" ? " selected" : ""}>Как указано</option>
         <option value="USD"${state.viewCurrency === "USD" ? " selected" : ""}>USD $</option>
         <option value="RUB"${state.viewCurrency === "RUB" ? " selected" : ""}>RUB ₽</option>
         <option value="AMD"${state.viewCurrency === "AMD" ? " selected" : ""}>AMD</option>
       </select>
-      <select id="categorySelect">
-        <option value=""${state.categoryFilter ? "" : " selected"}>Все категории</option>
-        ${categories.map(cat => `<option value="${escapeHtml(cat)}"${state.categoryFilter === cat ? " selected" : ""}>${escapeHtml(cat)}</option>`).join("")}
-      </select>
     </div>
   `;
 
   const list = visibleItems.length
     ? `<div class="grid">${visibleItems.map(renderCard).join("")}</div>`
-    : `<div class="empty-state"><h2>Ничего не найдено</h2><p>Попробуйте выбрать другую категорию.</p></div>`;
+    : `<div class="empty-state"><h2>Ничего не найдено</h2><p>Попробуйте включить другие категории.</p></div>`;
 
   el.innerHTML = filtersBar + list;
 
-  const categorySelect = el.querySelector("#categorySelect");
-  if(categorySelect){
-    categorySelect.addEventListener("change", () => {
-      state.categoryFilter = categorySelect.value;
-      renderMain();
+  const categoryDetails = el.querySelector("#categoryDropdown");
+  if(categoryDetails){
+    categoryDetails.addEventListener("toggle", () => {
+      categoryDropdownOpen = categoryDetails.open;
     });
   }
+  el.querySelectorAll(".categoryFilterCheckbox").forEach(cb => {
+    cb.addEventListener("change", () => {
+      if(cb.checked) state.excludedCategories.delete(cb.value);
+      else state.excludedCategories.add(cb.value);
+      renderMain();
+    });
+  });
   const sortSelect = el.querySelector("#sortSelect");
   if(sortSelect){
     sortSelect.addEventListener("change", () => {
