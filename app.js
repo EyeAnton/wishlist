@@ -34,7 +34,7 @@ let IS_ADMIN = false;
 
 const state = {
   items: [],
-  isOwner: false,      // права на добавление/редактирование/удаление; имён дарителей не видит
+  isOwner: false,      // права на добавление/редактирование/удаление; статус брони не видит вообще (сюрприз)
   canSeeNames: false,  // хелпер (жена) — видит, кто что дарит, но не может менять список
   ownerEmail: null,
   loading: true,
@@ -518,7 +518,7 @@ function openItemModal(existingItem){
     <div class="error-text" id="itemError"></div>
     <div class="modal-actions">
       ${isEdit ? '<button class="danger left" id="deleteItemBtn">Удалить</button>' : ""}
-      ${isEdit && item.reservedBy ? '<button class="secondary" id="unreserveBtn">Снять отметку «дарю»</button>' : ""}
+      ${isEdit ? '<button class="secondary" id="unreserveBtn">Сбросить бронь</button>' : ""}
       <button class="secondary" id="cancelItem">Отмена</button>
       <button id="saveItem">Сохранить</button>
     </div>
@@ -573,7 +573,7 @@ function openItemModal(existingItem){
           await withLoadingButton(unreserveBtn, async () => {
             await update(itemRef(item.id), { reservedBy: "" });
             closeModal();
-            showToast("Отметка снята");
+            showToast("Готово");
           });
         });
       }
@@ -704,10 +704,9 @@ function openDetailModal(item){
     ? `<div class="detail-thumbs">${images.map((src, i) => `<img src="${escapeHtml(src)}" class="detail-thumb${i === 0 ? " active" : ""}" data-src="${escapeHtml(src)}">`).join("")}</div>`
     : "";
 
-  const reservedLine = (item.reservedBy && (state.isOwner || state.canSeeNames))
-    ? `<div class="reserved-badge" style="display:inline-flex;margin-bottom:10px;">${
-        state.canSeeNames ? `🎁 Хотят подарить: ${escapeHtml(item.reservedBy)}` : "🎁 Уже дарят"
-      }</div>`
+  // Владельцу статус брони не показываем нигде, включая эту детальную карточку — см. renderCardFooter.
+  const reservedLine = (item.reservedBy && state.canSeeNames)
+    ? `<div class="reserved-badge" style="display:inline-flex;margin-bottom:10px;">🎁 Хотят подарить: ${escapeHtml(item.reservedBy)}</div>`
     : "";
 
   openModal(`
@@ -951,13 +950,13 @@ function renderCard(item){
 }
 
 function renderCardFooter(item){
-  // Владелец (получатель подарков) сюрприз не видит — только факт брони, без имени.
-  // Хелпер (жена) видит имя, чтобы помогать координировать подарки, но список не редактирует.
-  if(state.isOwner || state.canSeeNames){
+  // Владелец (получатель подарков) сюрприз не видит вообще — ни факта брони, ни имени,
+  // иначе сюрприза не остаётся. Хелпер (жена) видит имя, чтобы координировать подарки,
+  // но список не редактирует.
+  if(state.isOwner) return "";
+  if(state.canSeeNames){
     if(!item.reservedBy) return `<span style="color:var(--muted);font-size:.85rem;">Свободно</span>`;
-    return state.canSeeNames
-      ? `<span class="reserved-badge">🎁 Хотят подарить: ${escapeHtml(item.reservedBy)}</span>`
-      : `<span class="reserved-badge">🎁 Уже дарят</span>`;
+    return `<span class="reserved-badge">🎁 Хотят подарить: ${escapeHtml(item.reservedBy)}</span>`;
   }
   if(item.reservedBy){
     // Имя не показываем гостям — его же нужно ввести, чтобы отменить. Покажи мы его тут,
