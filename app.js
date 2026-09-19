@@ -1,6 +1,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getDatabase, ref, set, update, remove, onValue } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
 
 // ====== НАСТРОЙКИ (можно менять) ======
 const CONFIG = {
@@ -417,15 +418,29 @@ function closeModal(){
 // Firebase Auth сам хранит сессию между визитами — повторно логиниться не нужно.
 // Работает только на admin-странице — гостевая страница вообще не инициирует вход.
 let fbAuth = null;
+let fbStorage = null;
 
 function initFirebase(){
   try{
     const fbApp = initializeApp(CONFIG.FIREBASE_CONFIG);
     fbAuth = getAuth(fbApp);
     db = getDatabase(fbApp);
+    fbStorage = getStorage(fbApp);
   }catch(e){
     console.error("Firebase init failed", e);
   }
+}
+
+// Загружает файлы фото в Firebase Storage (папка items/) и возвращает их постоянные ссылки.
+async function uploadPhotoFiles(files){
+  const urls = [];
+  for(const file of files){
+    const path = `items/${Date.now()}-${uid()}-${file.name}`.replace(/\s+/g, "_");
+    const fileRef = storageRef(fbStorage, path);
+    await uploadBytes(fileRef, file);
+    urls.push(await getDownloadURL(fileRef));
+  }
+  return urls;
 }
 
 function initGoogleSignIn(){
@@ -508,8 +523,13 @@ function openItemModal(existingItem){
     </div>
     <div class="field">
       <label>Картинки</label>
+      <div style="margin-bottom:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <button type="button" class="secondary" id="uploadPhotosBtn" style="font-size:.82rem;padding:6px 12px;">📷 Загрузить фото</button>
+        <input type="file" id="fPhotoFiles" accept="image/*" multiple style="display:none;">
+        <span id="uploadPhotosStatus" style="font-size:.8rem;color:var(--muted);"></span>
+      </div>
       <textarea id="fImages" placeholder="https://...">${escapeHtml(existingImages.join("\n"))}</textarea>
-      <small>По одной ссылке на строку. Первая станет обложкой в списке.</small>
+      <small>По одной ссылке на строку, или загрузите фото с устройства кнопкой выше — можно выбрать сразу несколько. Первая станет обложкой в списке.</small>
     </div>
     <div class="field">
       <label>Заметка</label>
@@ -554,6 +574,29 @@ function openItemModal(existingItem){
             : "Не нашли данные на странице — впишите вручную";
         }catch(e){
           statusEl.textContent = "Не получилось: " + e.message;
+        }
+      });
+    });
+
+    const photoFilesInput = overlay.querySelector("#fPhotoFiles");
+    const uploadStatusEl = overlay.querySelector("#uploadPhotosStatus");
+    overlay.querySelector("#uploadPhotosBtn").addEventListener("click", () => photoFilesInput.click());
+    photoFilesInput.addEventListener("change", async () => {
+      const files = Array.from(photoFilesInput.files || []);
+      if(!files.length) return;
+      const uploadBtn = overlay.querySelector("#uploadPhotosBtn");
+      await withLoadingButton(uploadBtn, async () => {
+        uploadStatusEl.textContent = `Загружаем ${files.length} фото…`;
+        try{
+          const urls = await uploadPhotoFiles(files);
+          const imagesField = overlay.querySelector("#fImages");
+          const existingLines = imagesField.value.split("\n").map(s => s.trim()).filter(Boolean);
+          imagesField.value = [...existingLines, ...urls].join("\n");
+          uploadStatusEl.textContent = `Загружено: ${urls.length}`;
+        }catch(e){
+          uploadStatusEl.textContent = "Не получилось: " + e.message;
+        }finally{
+          photoFilesInput.value = "";
         }
       });
     });
