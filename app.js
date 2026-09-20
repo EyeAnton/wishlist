@@ -30,8 +30,8 @@ const CONFIG = {
 // не вписывать руками. Работает только пока цена/заметка ещё пустые, чтобы не затирать
 // то, что уже ввели.
 const LINK_PRESETS = [
-  { test: /ozon\.(ru|com)\b/i, currency: "RUB", pickupNote: "Пункт выдачи Ozon: ул. Адонца, 4, Ереван" },
-  { test: /wildberries\.(ru|by)\b|\bwb\.ru\b/i, currency: "RUB", pickupNote: "Пункт выдачи Wildberries: ул. Адонца, 17, Ереван" },
+  { test: /ozon\.(ru|com)\b/i, currency: "RUB", pickupNote: "ПВЗ Ozon: ул. Адонца, 4, Ереван" },
+  { test: /wildberries\.(ru|by)\b|\bwb\.ru\b/i, currency: "RUB", pickupNote: "ПВЗ Wildberries: ул. Адонца, 17, Ереван" },
 ];
 
 function matchLinkPreset(url){
