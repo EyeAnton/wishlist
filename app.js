@@ -25,6 +25,19 @@ const CONFIG = {
   ],
 };
 
+// Для магазинов, из которых часто заказывают из РФ (платят в рублях), при вставке ссылки
+// в форму нового подарка сами подставляем валюту и адрес ПВЗ в заметку — чтобы каждый раз
+// не вписывать руками. Работает только пока цена/заметка ещё пустые, чтобы не затирать
+// то, что уже ввели.
+const LINK_PRESETS = [
+  { test: /ozon\.(ru|com)\b/i, currency: "RUB", pickupNote: "Пункт выдачи Ozon: ул. Адонца, 4, Ереван" },
+  { test: /wildberries\.(ru|by)\b|\bwb\.ru\b/i, currency: "RUB", pickupNote: "Пункт выдачи Wildberries: ул. Адонца, 17, Ереван" },
+];
+
+function matchLinkPreset(url){
+  return LINK_PRESETS.find(p => p.test.test(url)) || null;
+}
+
 const LS = {
   theme: "wishlist_theme",
   viewCurrency: "wishlist_view_currency",
@@ -506,7 +519,7 @@ function openItemModal(existingItem){
   const existingImages = (item.images && item.images.length) ? item.images : (item.image ? [item.image] : []);
   const parsedPrice = isEdit ? parsePriceValue(item) : null;
   const initialAmount = parsedPrice ? parsedPrice.amount : "";
-  const initialCurrency = parsedPrice ? parsedPrice.currency : "RUB";
+  const initialCurrency = parsedPrice ? parsedPrice.currency : "AMD";
   const categoryOptions = Array.from(new Set([...FIXED_CATEGORIES, ...getAllCategories().filter(c => c !== NO_CATEGORY)]));
 
   openModal(`
@@ -565,6 +578,17 @@ function openItemModal(existingItem){
   `, overlay => {
     overlay.querySelector("#fTitle").focus();
     overlay.querySelector("#cancelItem").addEventListener("click", closeModal);
+
+    if(!isEdit){
+      overlay.querySelector("#fLink").addEventListener("input", () => {
+        const preset = matchLinkPreset(overlay.querySelector("#fLink").value.trim());
+        if(!preset) return;
+        const amountInput = overlay.querySelector("#fPriceAmount");
+        if(!amountInput.value.trim()) overlay.querySelector("#fPriceCurrency").value = preset.currency;
+        const noteField = overlay.querySelector("#fNote");
+        if(!noteField.value.trim()) noteField.value = preset.pickupNote;
+      });
+    }
 
     overlay.querySelector("#fetchLinkBtn").addEventListener("click", async () => {
       const url = overlay.querySelector("#fLink").value.trim();
