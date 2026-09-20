@@ -29,6 +29,7 @@ const LS = {
   theme: "wishlist_theme",
   viewCurrency: "wishlist_view_currency",
   rates: "wishlist_rates_cache",
+  introSeen: "wishlist_intro_seen",
 };
 
 let IS_ADMIN = false;
@@ -39,8 +40,8 @@ const state = {
   canSeeNames: false,  // хелпер (жена) — видит, кто что дарит, но не может менять список
   ownerEmail: null,
   loading: true,
-  viewCurrency: localStorage.getItem(LS.viewCurrency) || "original",
-  sortBy: "default", // "default" | "price_asc" | "price_desc"
+  viewCurrency: localStorage.getItem(LS.viewCurrency) || "original", // "original" = цена в валюте, в которой её ввели, без конвертации
+  sortBy: "price_asc", // "default" | "price_asc" | "price_desc" — по умолчанию сначала дешёвые
   excludedCategories: new Set(), // снятые галочки в выпадающем списке категорий
 };
 
@@ -760,7 +761,6 @@ function openDetailModal(item){
     ${reservedLine}
     ${item.note ? `<p class="card-note" style="white-space:pre-wrap;">${escapeHtml(item.note)}</p>` : ""}
     ${item.link ? `<div class="card-link" style="margin:10px 0;"><a href="${escapeHtml(item.link)}" target="_blank" rel="noopener">Открыть ссылку →</a></div>` : ""}
-    ${renderContacts()}
     <div class="modal-actions" id="detailActions"></div>
   `, overlay => {
     overlay.querySelectorAll(".detail-thumb").forEach(thumb => {
@@ -957,15 +957,43 @@ function renderMain(){
   });
 }
 
-// Мини-кнопки "написать в Telegram" — на случай вопросов про подарок или размер/цвет.
+// Кнопки "написать в Telegram" — живут только в шапке и в попапе с объяснением брони,
+// не в самих карточках. Раньше лежали в каждой карточке рядом с отметкой брони, и это
+// создавало ложное впечатление, что это Лера что-то забронировала.
 const TELEGRAM_ICON_SVG = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161c-.18 1.897-.962 6.502-1.359 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.831-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635.099-.002.321.023.465.14.121.098.153.23.169.324.016.093.036.306.02.472z"/></svg>`;
 
-function renderContacts(){
-  return `
-    <div class="card-contacts">
-      ${CONFIG.CONTACTS.map(c => `<a href="${escapeHtml(c.url)}" target="_blank" rel="noopener" class="contact-link">${TELEGRAM_ICON_SVG} ${escapeHtml(c.name)}</a>`).join("")}
+function renderTopContacts(){
+  const el = $("#topContacts");
+  if(!el) return;
+  el.innerHTML = CONFIG.CONTACTS.map(c => `<a href="${escapeHtml(c.url)}" target="_blank" rel="noopener" class="contact-link">${TELEGRAM_ICON_SVG} ${escapeHtml(c.name)}</a>`).join("");
+}
+
+// Попап-объяснение для гостей: что это за список, как бронировать и отменять бронь,
+// куда писать с вопросами. Показывается сам при первом визите (см. maybeShowIntro),
+// плюс доступен в любой момент по кнопке ℹ️ в шапке.
+function openIntroModal(){
+  openModal(`
+    <h3>🎁 Вишлист Антона</h3>
+    <p class="intro-text">Здесь — то, что его порадует. Выбирайте, что нравится!</p>
+    <p class="intro-text"><strong>Как забронировать.</strong> Нажмите «Хочу подарить» на понравившемся подарке и оставьте своё имя — оно нужно только на случай, если вы сами захотите отменить бронь, никому больше его не покажем. Антон брони вообще не видит: у него отдельная страница для списка, без каких-либо статусов — сюрприз останется сюрпризом.</p>
+    <p class="intro-text"><strong>Если передумали.</strong> Вернитесь к этому же подарку, нажмите «не я / отменить» и введите то же имя — бронь снимется.</p>
+    <p class="intro-text"><strong>Есть вопросы?</strong> Пишите Лере — подскажет по размеру, цвету и другим деталям. Антону тоже можно написать напрямую, только не про подарки 😉</p>
+    <div class="popup-contacts">
+      ${CONFIG.CONTACTS.map(c => `<a href="${escapeHtml(c.url)}" target="_blank" rel="noopener" class="contact-btn">${TELEGRAM_ICON_SVG} Написать: ${escapeHtml(c.name)}</a>`).join("")}
     </div>
-  `;
+    <div class="modal-actions">
+      <button id="introCloseBtn">Понятно, спасибо!</button>
+    </div>
+  `, overlay => {
+    overlay.querySelector("#introCloseBtn").addEventListener("click", closeModal);
+  }, { closeOnBackdrop: true });
+}
+
+function maybeShowIntro(){
+  if(IS_ADMIN) return;
+  if(localStorage.getItem(LS.introSeen)) return;
+  openIntroModal();
+  localStorage.setItem(LS.introSeen, "1");
 }
 
 function renderCard(item){
@@ -986,7 +1014,6 @@ function renderCard(item){
         <div class="card-footer">
           ${renderCardFooter(item)}
         </div>
-        ${renderContacts()}
       </div>
     </div>
   `;
@@ -1038,7 +1065,13 @@ export function initApp(opts){
   initCountdown();
   initFirebase();
   renderAll();
-  if(IS_ADMIN) initGoogleSignIn();
+  if(IS_ADMIN){
+    initGoogleSignIn();
+  }else{
+    renderTopContacts();
+    $("#infoBtn")?.addEventListener("click", openIntroModal);
+    maybeShowIntro();
+  }
   watchItems();
   loadRates();
 }
