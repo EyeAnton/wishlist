@@ -274,6 +274,22 @@ const HTML_PROXIES = [
   url => "https://api.cors.lol/?url=" + encodeURIComponent(url),
 ];
 
+// Некоторые магазины (например Ozon) на любой автоматический запрос — с любого прокси,
+// включая наш собственный Worker — отвечают HTTP 200 с страницей-заглушкой антибота
+// вместо самого товара. Без этой проверки такая заглушка тихо подставлялась бы как
+// заголовок товара. Настоящего обхода такой защиты нет — она требует полноценного
+// браузера с JS, это уже не задача для простого прокси.
+const BOT_BLOCK_TITLES = [/antibot challenge/i, /just a moment/i, /attention required/i, /access denied/i, /^403 forbidden$/i, /похоже,?\s*нет соединения/i];
+
+function extractTitleTag(html){
+  const m = html.match(/<title[^>]*>([^<]*)<\/title>/i);
+  return m ? m[1].trim() : "";
+}
+
+function isBotBlockPage(titleOrHtml){
+  return BOT_BLOCK_TITLES.some(rx => rx.test(titleOrHtml));
+}
+
 async function fetchHtmlViaProxies(url){
   let lastError = null;
   for(const buildProxyUrl of HTML_PROXIES){
@@ -281,6 +297,7 @@ async function fetchHtmlViaProxies(url){
       const res = await fetchWithTimeout(buildProxyUrl(url), 9000);
       if(!res.ok) throw new Error("код " + res.status);
       const text = await res.text();
+      if(isBotBlockPage(extractTitleTag(text))) throw new Error("сайт заблокировал автоматический просмотр");
       if(text && text.length > 200 && !/rate limit/i.test(text)) return text;
       lastError = new Error("прокси вернул пустой ответ");
     }catch(e){
@@ -305,7 +322,9 @@ async function fetchTitleOnlyFallback(url){
   if(!res.ok) throw new Error("код " + res.status);
   const text = await res.text();
   const match = text.match(/^Title:\s*(.+)$/m);
-  return { title: match ? cleanupTitle(match[1]) : "", image: "", images: [], price: "" };
+  const title = match ? cleanupTitle(match[1]) : "";
+  if(isBotBlockPage(title)) throw new Error("сайт заблокировал автоматический просмотр");
+  return { title, image: "", images: [], price: "" };
 }
 
 async function fetchLinkPreview(url){
@@ -487,7 +506,7 @@ function openItemModal(existingItem){
   const existingImages = (item.images && item.images.length) ? item.images : (item.image ? [item.image] : []);
   const parsedPrice = isEdit ? parsePriceValue(item) : null;
   const initialAmount = parsedPrice ? parsedPrice.amount : "";
-  const initialCurrency = parsedPrice ? parsedPrice.currency : "AMD";
+  const initialCurrency = parsedPrice ? parsedPrice.currency : "RUB";
   const categoryOptions = Array.from(new Set([...FIXED_CATEGORIES, ...getAllCategories().filter(c => c !== NO_CATEGORY)]));
 
   openModal(`
