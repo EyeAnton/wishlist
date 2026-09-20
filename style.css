@@ -89,6 +89,7 @@ header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; g
 .theme-switch[aria-checked="true"]{background:var(--accent-solid);}
 .theme-switch[aria-checked="true"] .theme-switch-knob{transform:translateX(20px);}
 .header-controls{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+.top-contacts{display:flex; gap:12px; align-items:center;}
 .owner-controls{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
 /* Отступ текста слева (14px) равен отступу от стрелки до правого края (тоже 14px,
    через background-position). Родная стрелка браузера отключена (appearance:none),
@@ -171,6 +172,16 @@ button:disabled{opacity:.55; cursor:not-allowed;}
 .contact-link{font-size:.8rem; color:var(--muted); text-decoration:none; display:inline-flex; align-items:center; gap:4px;}
 .contact-link svg{width:14px; height:14px; flex:none;}
 .contact-link:hover{color:var(--accent-solid); text-decoration:underline;}
+.popup-contacts{display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;}
+.popup-contacts .contact-btn{
+  display:inline-flex; align-items:center; gap:8px; font-size:.88rem; font-weight:600;
+  padding:10px 14px; border-radius:10px; background:var(--input-bg); border:1px solid var(--border);
+  color:var(--text); text-decoration:none; transition:background .15s, border-color .15s, color .15s;
+}
+.popup-contacts .contact-btn svg{width:16px; height:16px; flex:none;}
+.popup-contacts .contact-btn:hover{border-color:var(--accent-solid); color:var(--accent-solid); background:var(--card);}
+.intro-text{color:var(--text); font-size:.92rem; line-height:1.55; margin:0 0 12px;}
+.intro-text strong{color:var(--text);}
 .reserved-badge{
   background:var(--reserved-bg); color:var(--reserved-text); font-size:.8rem; padding:6px 10px; border-radius:8px; font-weight:600;
   display:flex; align-items:center; gap:6px; flex:1;
