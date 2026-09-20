@@ -991,6 +991,20 @@ function renderMain(){
       if(e.target.closest("button, a")) return; // у кнопок и ссылок своё поведение
       openDetailModal(item);
     });
+    const cardImages = (item.images && item.images.length) ? item.images : (item.image ? [item.image] : []);
+    if(cardImages.length > 1){
+      const cardImgBox = card.querySelector(".card-img");
+      const mainImg = cardImgBox.querySelector(".card-img-main");
+      const dots = Array.from(cardImgBox.querySelectorAll(".card-img-dot"));
+      cardImgBox.addEventListener("mousemove", e => {
+        const rect = cardImgBox.getBoundingClientRect();
+        const ratio = (e.clientX - rect.left) / rect.width;
+        const idx = Math.min(cardImages.length - 1, Math.max(0, Math.floor(ratio * cardImages.length)));
+        mainImg.src = cardImages[idx];
+        dots.forEach((dot, i) => dot.classList.toggle("active", i === idx));
+      });
+      // При уходе курсора ничего не сбрасываем — так и должна остаться последняя показанная фотография.
+    }
     if(state.isOwner){
       card.querySelector(".editBtn")?.addEventListener("click", () => openItemModal(item));
     }else if(!state.canSeeNames){
@@ -1040,14 +1054,18 @@ function maybeShowIntro(){
 }
 
 function renderCard(item){
-  const img = item.image
-    ? `<img src="${escapeHtml(item.image)}" alt="" onerror="this.parentElement.innerHTML='🎁'">`
+  const images = (item.images && item.images.length) ? item.images : (item.image ? [item.image] : []);
+  const img = images.length
+    ? `<img class="card-img-main" src="${escapeHtml(images[0])}" alt="" onerror="this.parentElement.innerHTML='🎁'">`
     : "🎁";
+  const dots = images.length > 1
+    ? `<div class="card-img-dots">${images.map((_, i) => `<span class="card-img-dot${i === 0 ? " active" : ""}"></span>`).join("")}</div>`
+    : "";
   const price = displayPrice(item);
   return `
     <div class="card" data-id="${escapeHtml(item.id)}">
       ${state.isOwner ? `<div class="owner-actions"><button class="secondary editBtn">✎</button></div>` : ""}
-      <div class="card-img">${img}</div>
+      <div class="card-img">${img}${dots}</div>
       <div class="card-body">
         <p class="card-title">${item.link
           ? `<a href="${escapeHtml(item.link)}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a>`
