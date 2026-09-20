@@ -158,7 +158,7 @@ button:disabled{opacity:.55; cursor:not-allowed;}
   width:100%; aspect-ratio:1/1; background:var(--card-img-bg); display:flex; align-items:center; justify-content:center;
   font-size:2.6rem; overflow:hidden;
 }
-.card-img img{width:100%; height:100%; object-fit:cover; display:block;}
+.card-img img{width:100%; height:100%; object-fit:contain; display:block;}
 .card-body{padding:14px 16px 16px; display:flex; flex-direction:column; gap:6px; flex:1;}
 .card-title{font-weight:600; font-size:1.05rem; margin:0; color:var(--text);}
 .card-title a{color:inherit; text-decoration:none;}
