@@ -914,6 +914,9 @@ function renderMain(){
       return (pa - pb) * dir;
     });
   }
+  // Закреплённые товары всегда идут первыми, независимо от сортировки — сортировка стабильна,
+  // так что порядок среди остальных не трогаем.
+  visibleItems = visibleItems.slice().sort((a, b) => (a.pinned ? 0 : 1) - (b.pinned ? 0 : 1));
 
   const includedCount = categories.filter(c => !state.excludedCategories.has(c)).length;
   const categoryLabel = includedCount === categories.length
