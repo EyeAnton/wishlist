@@ -56,6 +56,7 @@ const state = {
   viewCurrency: localStorage.getItem(LS.viewCurrency) || "original", // "original" = цена в валюте, в которой её ввели, без конвертации
   sortBy: "price_asc", // "default" | "price_asc" | "price_desc" — по умолчанию сначала дешёвые
   excludedCategories: new Set(), // снятые галочки в выпадающем списке категорий
+  onlyMarketplace: false, // галочка "можно купить на Ozon/WB" в панели фильтров
 };
 
 let categoryDropdownOpen = false;
@@ -68,7 +69,7 @@ document.addEventListener("click", e => {
 });
 
 const NO_CATEGORY = "Без категории";
-const FIXED_CATEGORIES = ["Девайсы", "Настолки", "Кофе", "Подписки"];
+const FIXED_CATEGORIES = ["Девайсы", "Настолки", "Кофе", "Подписки", "Книги", "Одежда", "Хобби"];
 
 function categoryOf(item){
   return (item.category && item.category.trim()) ? item.category.trim() : NO_CATEGORY;
@@ -901,6 +902,7 @@ function renderMain(){
   // Отложенные товары видит только владелец (полупрозрачными, см. renderCard) — все остальные
   // роли их вообще не видят, ни гости, ни хелпер.
   if(!state.isOwner) visibleItems = visibleItems.filter(item => !item.postponed);
+  if(state.onlyMarketplace) visibleItems = visibleItems.filter(item => !!matchLinkPreset(item.link || ""));
 
   if(state.sortBy === "price_asc" || state.sortBy === "price_desc"){
     const dir = state.sortBy === "price_asc" ? 1 : -1;
@@ -912,6 +914,9 @@ function renderMain(){
       return (pa - pb) * dir;
     });
   }
+  // Закреплённые товары всегда идут первыми, независимо от сортировки — сортировка стабильна,
+  // так что порядок среди остальных не трогаем.
+  visibleItems = visibleItems.slice().sort((a, b) => (a.pinned ? 0 : 1) - (b.pinned ? 0 : 1));
 
   const includedCount = categories.filter(c => !state.excludedCategories.has(c)).length;
   const categoryLabel = includedCount === categories.length
@@ -949,6 +954,10 @@ function renderMain(){
         <option value="RUB"${state.viewCurrency === "RUB" ? " selected" : ""}>RUB ₽</option>
         <option value="AMD"${state.viewCurrency === "AMD" ? " selected" : ""}>AMD</option>
       </select>
+      <label class="filter-chip">
+        <input type="checkbox" id="onlyMarketplaceCheckbox" ${state.onlyMarketplace ? "checked" : ""}>
+        Можно купить на Ozon/WB
+      </label>
     </div>
   `;
 
@@ -983,6 +992,13 @@ function renderMain(){
     currencySelect.addEventListener("change", () => {
       state.viewCurrency = currencySelect.value;
       localStorage.setItem(LS.viewCurrency, state.viewCurrency);
+      renderMain();
+    });
+  }
+  const onlyMarketplaceCheckbox = el.querySelector("#onlyMarketplaceCheckbox");
+  if(onlyMarketplaceCheckbox){
+    onlyMarketplaceCheckbox.addEventListener("change", () => {
+      state.onlyMarketplace = onlyMarketplaceCheckbox.checked;
       renderMain();
     });
   }
