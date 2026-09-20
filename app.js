@@ -898,6 +898,9 @@ function renderMain(){
 
   const categories = getAllCategories();
   let visibleItems = state.items.filter(item => !state.excludedCategories.has(categoryOf(item)));
+  // Отложенные товары видит только владелец (полупрозрачными, см. renderCard) — все остальные
+  // роли их вообще не видят, ни гости, ни хелпер.
+  if(!state.isOwner) visibleItems = visibleItems.filter(item => !item.postponed);
 
   if(state.sortBy === "price_asc" || state.sortBy === "price_desc"){
     const dir = state.sortBy === "price_asc" ? 1 : -1;
@@ -1007,6 +1010,10 @@ function renderMain(){
     }
     if(state.isOwner){
       card.querySelector(".editBtn")?.addEventListener("click", () => openItemModal(item));
+      card.querySelector(".postponeBtn")?.addEventListener("click", async () => {
+        await update(itemRef(item.id), { postponed: !item.postponed });
+        showToast(item.postponed ? "Возвращено в список" : "Отложено");
+      });
     }else if(!state.canSeeNames){
       card.querySelector(".reserveBtn")?.addEventListener("click", () => openReserveModal(item));
       card.querySelector(".cancelReserveBtn")?.addEventListener("click", () => openCancelReserveModal(item));
@@ -1063,8 +1070,13 @@ function renderCard(item){
     : "";
   const price = displayPrice(item);
   return `
-    <div class="card" data-id="${escapeHtml(item.id)}">
-      ${state.isOwner ? `<div class="owner-actions"><button class="secondary editBtn">✎</button></div>` : ""}
+    <div class="card${state.isOwner && item.postponed ? " card-postponed" : ""}" data-id="${escapeHtml(item.id)}">
+      ${state.isOwner ? `
+        <div class="owner-actions">
+          <button class="secondary editBtn" title="Редактировать">✎</button>
+          <button class="secondary postponeBtn" title="${item.postponed ? "Вернуть в список" : "Отложить (скрыть из публичного списка)"}">${item.postponed ? "↩" : "⏸"}</button>
+        </div>
+      ` : ""}
       <div class="card-img">${img}${dots}</div>
       <div class="card-body">
         <p class="card-title">${item.link
