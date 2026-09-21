@@ -55,7 +55,7 @@ const state = {
   loading: true,
   viewCurrency: localStorage.getItem(LS.viewCurrency) || "original", // "original" = цена в валюте, в которой её ввели, без конвертации
   sortBy: "price_asc", // "default" | "price_asc" | "price_desc" — по умолчанию сначала дешёвые
-  excludedCategories: new Set(), // снятые галочки в выпадающем списке категорий
+  selectedCategories: new Set(), // отмеченные категории в выпадающем списке; пусто = показать всё
   onlyMarketplace: false, // галочка "можно купить на Ozon/WB" в панели фильтров
 };
 
@@ -898,7 +898,9 @@ function renderMain(){
   }
 
   const categories = getAllCategories();
-  let visibleItems = state.items.filter(item => !state.excludedCategories.has(categoryOf(item)));
+  // Пустой выбор категорий значит "показать всё" — отмечать нужно только то, что хочешь увидеть,
+  // а не снимать галочки со всего остального.
+  let visibleItems = state.items.filter(item => state.selectedCategories.size === 0 || state.selectedCategories.has(categoryOf(item)));
   // Отложенные товары видит только владелец (полупрозрачными, см. renderCard) — все остальные
   // роли их вообще не видят, ни гости, ни хелпер.
   if(!state.isOwner) visibleItems = visibleItems.filter(item => !item.postponed);
@@ -918,14 +920,11 @@ function renderMain(){
   // так что порядок среди остальных не трогаем.
   visibleItems = visibleItems.slice().sort((a, b) => (a.pinned ? 0 : 1) - (b.pinned ? 0 : 1));
 
-  const includedCount = categories.filter(c => !state.excludedCategories.has(c)).length;
-  const categoryLabel = includedCount === categories.length
+  const categoryLabel = state.selectedCategories.size === 0
     ? "Все категории"
-    : includedCount === 0
-      ? "Категории не выбраны"
-      : includedCount === 1
-        ? categories.find(c => !state.excludedCategories.has(c))
-        : `Категории: ${includedCount}`;
+    : state.selectedCategories.size === 1
+      ? Array.from(state.selectedCategories)[0]
+      : `Категории: ${state.selectedCategories.size}`;
 
   const filtersBar = `
     <div class="filters-bar">
@@ -942,7 +941,7 @@ function renderMain(){
         <div class="dropdown-check-panel">
           ${categories.map(cat => `
             <label class="filter-chip">
-              <input type="checkbox" class="categoryFilterCheckbox" value="${escapeHtml(cat)}" ${state.excludedCategories.has(cat) ? "" : "checked"}>
+              <input type="checkbox" class="categoryFilterCheckbox" value="${escapeHtml(cat)}" ${state.selectedCategories.has(cat) ? "checked" : ""}>
               ${escapeHtml(cat)}
             </label>
           `).join("")}
@@ -975,8 +974,8 @@ function renderMain(){
   }
   el.querySelectorAll(".categoryFilterCheckbox").forEach(cb => {
     cb.addEventListener("change", () => {
-      if(cb.checked) state.excludedCategories.delete(cb.value);
-      else state.excludedCategories.add(cb.value);
+      if(cb.checked) state.selectedCategories.add(cb.value);
+      else state.selectedCategories.delete(cb.value);
       renderMain();
     });
   });
