@@ -59,12 +59,14 @@ const state = {
   onlyMarketplace: false, // галочка "можно купить на Ozon/WB" в панели фильтров
 };
 
-let categoryDropdownOpen = false;
+// Какой из фильтров-дропдаунов (сортировка/категории/валюта) сейчас открыт — общий на все три,
+// т.к. renderMain() каждый раз перестраивает всю панель фильтров заново и теряет атрибут open.
+let openDropdownId = null;
 document.addEventListener("click", e => {
   const open = document.querySelector(".dropdown-check[open]");
   if(open && !open.contains(e.target)){
     open.open = false;
-    categoryDropdownOpen = false;
+    openDropdownId = null;
   }
 });
 
@@ -920,23 +922,41 @@ function renderMain(){
   // так что порядок среди остальных не трогаем.
   visibleItems = visibleItems.slice().sort((a, b) => (a.pinned ? 0 : 1) - (b.pinned ? 0 : 1));
 
-  const categoryLabel = state.selectedCategories.size === 0
-    ? "Все категории"
-    : state.selectedCategories.size === 1
-      ? Array.from(state.selectedCategories)[0]
-      : `Категории: ${state.selectedCategories.size}`;
+  // Заголовки дропдаунов фиксированные ("Сортировка"/"Категории"/"Валюта") и не отражают текущий
+  // выбор — раньше там был текущий вариант, и это смотрелось странно (особенно с длинными названиями).
+  const dropdownArrow = `<svg class="dropdown-check-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="5 8 10 13 15 8"/></svg>`;
+  const sortOptions = [
+    ["default", "Порядок: по умолчанию"],
+    ["price_asc", "Цена: сначала дешёвые"],
+    ["price_desc", "Цена: сначала дорогие"],
+  ];
+  const currencyOptions = [
+    ["original", "Как указано"],
+    ["USD", "USD $"],
+    ["RUB", "RUB ₽"],
+    ["AMD", "AMD"],
+  ];
 
   const filtersBar = `
     <div class="filters-bar">
-      <select id="sortSelect">
-        <option value="default"${state.sortBy === "default" ? " selected" : ""}>Порядок: по умолчанию</option>
-        <option value="price_asc"${state.sortBy === "price_asc" ? " selected" : ""}>Цена: сначала дешёвые</option>
-        <option value="price_desc"${state.sortBy === "price_desc" ? " selected" : ""}>Цена: сначала дорогие</option>
-      </select>
-      <details class="dropdown-check" id="categoryDropdown"${categoryDropdownOpen ? " open" : ""}>
+      <details class="dropdown-check" id="sortDropdown"${openDropdownId === "sortDropdown" ? " open" : ""}>
         <summary class="dropdown-check-toggle">
-          <span>${escapeHtml(categoryLabel)}</span>
-          <svg class="dropdown-check-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="5 8 10 13 15 8"/></svg>
+          <span>Сортировка</span>
+          ${dropdownArrow}
+        </summary>
+        <div class="dropdown-check-panel">
+          ${sortOptions.map(([value, label]) => `
+            <label class="filter-chip">
+              <input type="radio" name="sortRadio" class="sortRadio" value="${value}" ${state.sortBy === value ? "checked" : ""}>
+              ${escapeHtml(label)}
+            </label>
+          `).join("")}
+        </div>
+      </details>
+      <details class="dropdown-check" id="categoryDropdown"${openDropdownId === "categoryDropdown" ? " open" : ""}>
+        <summary class="dropdown-check-toggle">
+          <span>Категории</span>
+          ${dropdownArrow}
         </summary>
         <div class="dropdown-check-panel">
           ${categories.map(cat => `
@@ -947,12 +967,20 @@ function renderMain(){
           `).join("")}
         </div>
       </details>
-      <select id="currencySelect" title="Валюта отображения">
-        <option value="original"${state.viewCurrency === "original" ? " selected" : ""}>Как указано</option>
-        <option value="USD"${state.viewCurrency === "USD" ? " selected" : ""}>USD $</option>
-        <option value="RUB"${state.viewCurrency === "RUB" ? " selected" : ""}>RUB ₽</option>
-        <option value="AMD"${state.viewCurrency === "AMD" ? " selected" : ""}>AMD</option>
-      </select>
+      <details class="dropdown-check" id="currencyDropdown"${openDropdownId === "currencyDropdown" ? " open" : ""}>
+        <summary class="dropdown-check-toggle">
+          <span>Валюта</span>
+          ${dropdownArrow}
+        </summary>
+        <div class="dropdown-check-panel">
+          ${currencyOptions.map(([value, label]) => `
+            <label class="filter-chip">
+              <input type="radio" name="currencyRadio" class="currencyRadio" value="${value}" ${state.viewCurrency === value ? "checked" : ""}>
+              ${escapeHtml(label)}
+            </label>
+          `).join("")}
+        </div>
+      </details>
       <label class="filter-chip">
         <input type="checkbox" id="onlyMarketplaceCheckbox" ${state.onlyMarketplace ? "checked" : ""}>
         Можно купить на Ozon/WB
@@ -966,12 +994,11 @@ function renderMain(){
 
   el.innerHTML = filtersBar + list;
 
-  const categoryDetails = el.querySelector("#categoryDropdown");
-  if(categoryDetails){
-    categoryDetails.addEventListener("toggle", () => {
-      categoryDropdownOpen = categoryDetails.open;
+  el.querySelectorAll(".dropdown-check").forEach(details => {
+    details.addEventListener("toggle", () => {
+      openDropdownId = details.open ? details.id : null;
     });
-  }
+  });
   el.querySelectorAll(".categoryFilterCheckbox").forEach(cb => {
     cb.addEventListener("change", () => {
       if(cb.checked) state.selectedCategories.add(cb.value);
@@ -979,21 +1006,21 @@ function renderMain(){
       renderMain();
     });
   });
-  const sortSelect = el.querySelector("#sortSelect");
-  if(sortSelect){
-    sortSelect.addEventListener("change", () => {
-      state.sortBy = sortSelect.value;
+  el.querySelectorAll(".sortRadio").forEach(radio => {
+    radio.addEventListener("change", () => {
+      state.sortBy = radio.value;
+      openDropdownId = null; // выбор одного варианта — дропдаун закрывается сам
       renderMain();
     });
-  }
-  const currencySelect = el.querySelector("#currencySelect");
-  if(currencySelect){
-    currencySelect.addEventListener("change", () => {
-      state.viewCurrency = currencySelect.value;
+  });
+  el.querySelectorAll(".currencyRadio").forEach(radio => {
+    radio.addEventListener("change", () => {
+      state.viewCurrency = radio.value;
       localStorage.setItem(LS.viewCurrency, state.viewCurrency);
+      openDropdownId = null;
       renderMain();
     });
-  }
+  });
   const onlyMarketplaceCheckbox = el.querySelector("#onlyMarketplaceCheckbox");
   if(onlyMarketplaceCheckbox){
     onlyMarketplaceCheckbox.addEventListener("change", () => {
