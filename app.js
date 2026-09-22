@@ -151,7 +151,7 @@ function renderCountdown(){
   if(target < today) target = new Date(now.getFullYear() + 1, 9, 1);
   const dayMs = 1000 * 60 * 60 * 24;
   const daysLeft = Math.round((target - today) / dayMs);
-  const label = daysLeft <= 0 ? "Сегодня 1 октября! 🎉" : `Всего ${daysLeft} ${daysWord(daysLeft)}!`;
+  const label = daysLeft <= 0 ? "Сегодня 1 октября! 🎉" : `Осталось ${daysLeft} ${daysWord(daysLeft)}!`;
 
   // По клеточке на каждый оставшийся день, с датой внутри. Последняя клетка (день Х) —
   // с эмодзи-праздником вместо числа, чтобы сразу выделялась.
@@ -167,8 +167,7 @@ function renderCountdown(){
   }).join("");
 
   el.innerHTML = `
-    <div class="calendar-row">${cells}</div>
-    <div class="countdown-label">${label}</div>
+    <div class="calendar-row">${cells}<div class="countdown-label">${label}</div></div>
   `;
 }
 
@@ -900,7 +899,7 @@ function openDetailModal(item){
       // До входа на админ-странице — то же самое, никакой брони.
       actions.innerHTML = `<button class="secondary" id="detailClose">Закрыть</button>`;
     }else if(item.reservedBy){
-      actions.innerHTML = `<button class="secondary" id="detailClose">Закрыть</button><button class="ghost" id="detailCancel">не я / отменить</button>`;
+      actions.innerHTML = `<button class="secondary" id="detailClose">Закрыть</button><button class="ghost" id="detailCancel">Отменить</button>`;
       actions.querySelector("#detailCancel").addEventListener("click", () => openCancelReserveModal(item));
     }else{
       actions.innerHTML = `<button class="secondary" id="detailClose">Закрыть</button><button id="detailReserve">Хочу подарить</button>`;
@@ -1062,12 +1061,12 @@ function renderMain(){
           `).join("")}
         </div>
       </details>
-      ${!IS_ADMIN ? '<span id="infoBtnSlot"></span>' : ""}
       <label class="filter-chip marketplace-filter">
         <input type="checkbox" id="onlyMarketplaceCheckbox" ${state.onlyMarketplace ? "checked" : ""}>
-        <span class="marketplace-label-full">Можно купить на Ozon/WB</span>
-        <span class="marketplace-label-short">Ozon/WB</span>
+        <span class="marketplace-label-full">Можно купить на Ozon</span>
+        <span class="marketplace-label-short">Ozon</span>
       </label>
+      ${!IS_ADMIN ? '<span id="infoBtnSlot"></span>' : ""}
     </div>
   `;
 
@@ -1175,7 +1174,7 @@ function openIntroModal(){
     <h3>🎁 Вишлист Антона</h3>
     <p class="intro-text">Здесь — то, что его порадует. Выбирайте, что нравится!</p>
     <p class="intro-text"><strong>Как забронировать.</strong> Нажмите «Хочу подарить», оставьте имя — его увидите только вы, Антон брони не видит, сюрприз останется сюрпризом.</p>
-    <p class="intro-text"><strong>Если передумали.</strong> Вернитесь к подарку, нажмите «не я / отменить» и введите то же имя.</p>
+    <p class="intro-text"><strong>Если передумали.</strong> Вернитесь к подарку, нажмите «Отменить» и введите то же имя.</p>
     <p class="intro-text"><strong>Есть вопросы?</strong> Пишите Лере — подскажет по размеру, цвету и другим деталям. Антону тоже можно написать напрямую 😉</p>
     <div class="popup-contacts">
       ${CONFIG.CONTACTS.map(c => `<a href="${escapeHtml(c.url)}" target="_blank" rel="noopener" class="contact-btn">${TELEGRAM_ICON_SVG} Написать: ${escapeHtml(c.name)}</a>`).join("")}
@@ -1244,7 +1243,7 @@ function renderCardFooter(item){
     // любой гость мог бы подсмотреть и отменить чужую отметку.
     return `
       <span class="reserved-badge">🎁 Уже дарят</span>
-      <button class="ghost cancelReserveBtn" style="font-size:.78rem;">не я / отменить</button>
+      <button class="ghost cancelReserveBtn" style="font-size:.78rem;">Отменить</button>
     `;
   }
   return `<button class="full-btn reserveBtn">Хочу подарить</button>`;
