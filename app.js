@@ -1137,20 +1137,26 @@ function renderMain(){
       const cardImgBox = card.querySelector(".card-img");
       const mainImg = cardImgBox.querySelector(".card-img-main");
       const dots = Array.from(cardImgBox.querySelectorAll(".card-img-dot"));
-      const showByRatio = ratio => {
-        const idx = Math.min(cardImages.length - 1, Math.max(0, Math.floor(ratio * cardImages.length)));
-        mainImg.src = cardImages[idx];
-        dots.forEach((dot, i) => dot.classList.toggle("active", i === idx));
+      let currentIdx = 0;
+      const setIdx = idx => {
+        currentIdx = Math.min(cardImages.length - 1, Math.max(0, idx));
+        mainImg.src = cardImages[currentIdx];
+        dots.forEach((dot, i) => dot.classList.toggle("active", i === currentIdx));
       };
       cardImgBox.addEventListener("mousemove", e => {
         const rect = cardImgBox.getBoundingClientRect();
-        showByRatio((e.clientX - rect.left) / rect.width);
+        const ratio = (e.clientX - rect.left) / rect.width;
+        setIdx(Math.floor(ratio * cardImages.length));
       });
       // При уходе курсора ничего не сбрасываем — так и должна остаться последняя показанная фотография.
 
-      // На мобильных мыши нет — свайп по фото листает картинки так же, как наведение на десктопе.
-      // Гейтим на горизонтальность жеста, чтобы не мешать обычному вертикальному скроллу страницы,
-      // и гасим клик по карточке после свайпа, чтобы не открывалась детальная карточка товара.
+      // На мобильных мыши нет — свайп по фото листает картинки. В отличие от десктопного
+      // наведения (где курсор двигается по всей ширине и можно непрерывно "сканировать"
+      // позицию), палец обычно проходит только часть ширины карточки за один жест — так что
+      // вместо пересчёта по абсолютной позиции один свайп просто листает на одну фотку вперёд
+      // или назад, по направлению движения. Гейтим на горизонтальность жеста, чтобы не мешать
+      // обычному вертикальному скроллу страницы, и гасим клик по карточке после свайпа, чтобы
+      // не открывалась детальная карточка товара.
       let touchStartX = 0, touchStartY = 0, swiping = false, justSwiped = false;
       cardImgBox.addEventListener("touchstart", e => {
         touchStartX = e.touches[0].clientX;
@@ -1161,13 +1167,15 @@ function renderMain(){
         const dx = e.touches[0].clientX - touchStartX;
         const dy = e.touches[0].clientY - touchStartY;
         if(!swiping && Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 8) swiping = true;
-        if(swiping){
-          e.preventDefault();
-          const rect = cardImgBox.getBoundingClientRect();
-          showByRatio((e.touches[0].clientX - rect.left) / rect.width);
-        }
+        if(swiping) e.preventDefault();
       }, { passive: false });
-      cardImgBox.addEventListener("touchend", () => { if(swiping) justSwiped = true; });
+      cardImgBox.addEventListener("touchend", e => {
+        if(!swiping) return;
+        justSwiped = true;
+        const dx = e.changedTouches[0].clientX - touchStartX;
+        if(dx <= -24) setIdx(currentIdx + 1);
+        else if(dx >= 24) setIdx(currentIdx - 1);
+      });
       cardImgBox.addEventListener("click", e => {
         if(justSwiped){ e.stopPropagation(); justSwiped = false; }
       });
