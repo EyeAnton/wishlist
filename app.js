@@ -43,6 +43,7 @@ const LS = {
   viewCurrency: "wishlist_view_currency",
   rates: "wishlist_rates_cache",
   introSeen: "wishlist_intro_seen",
+  dailyFactSeen: "wishlist_daily_fact_seen",
 };
 
 let IS_ADMIN = false;
@@ -141,29 +142,56 @@ function daysWord(n){
 
 const DOW_SHORT = ["ВС", "ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ"];
 const MONTH_SHORT = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+const DAY_MS = 1000 * 60 * 60 * 24;
+
+// Точка отсчёта календарика зафиксирована (не "сегодня минус N") — так уже открытые клетки
+// не съезжают и не пересчитываются, а просто остаются на месте и помечаются прошедшими.
+const CALENDAR_START = new Date(2026, 8, 22);
+
+// Факт про Антона на каждый день — открывается в свой день (ключ "YYYY-MM-DD"), доступен по
+// клику на уже прошедшую (оторванную) клетку. Новых фактов пока нет — добавляются сюда по мере
+// приближения дня.
+const DAILY_FACTS = {
+  "2026-09-22": "За 2026 год потратил на настолки 370 долларов 🎲",
+};
+
+function dateKey(d){
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function getBirthdayTarget(today){
+  let target = new Date(today.getFullYear(), 9, 1); // месяцы с 0 — 9 это октябрь
+  if(target < today) target = new Date(today.getFullYear() + 1, 9, 1);
+  return target;
+}
 
 function renderCountdown(){
   const el = $("#countdown");
   if(!el) return;
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  let target = new Date(now.getFullYear(), 9, 1); // месяцы с 0 — 9 это октябрь
-  if(target < today) target = new Date(now.getFullYear() + 1, 9, 1);
-  const dayMs = 1000 * 60 * 60 * 24;
-  const daysLeft = Math.round((target - today) / dayMs);
+  const target = getBirthdayTarget(today);
+  const daysLeft = Math.round((target - today) / DAY_MS);
   const label = daysLeft <= 0 ? "Сегодня 1 октября! 🎉" : `Осталось ${daysLeft} ${daysWord(daysLeft)}!`;
 
-  // По клеточке на каждый оставшийся день, с датой внутри. У последней клетки (день Х) число
-  // остаётся на месте (иначе неясно, что это именно 1 октября), а праздничный эмодзи ложится
-  // полупрозрачным фоном под цифрой, чтобы день сразу бросался в глаза.
-  const cells = Array.from({ length: Math.max(daysLeft, 0) }, (_, i) => {
-    const d = new Date(today.getTime() + (i + 1) * dayMs);
+  // По клеточке на каждый день от фиксированного старта до 1 октября — ряд не сжимается со
+  // временем. У последней клетки (день Х) число остаётся на месте (иначе неясно, что это именно
+  // 1 октября), а праздничный эмодзи ложится полупрозрачным фоном под цифрой. Прошедшие клетки
+  // (включая сегодняшнюю — её факт уже открыт) выглядят слегка оторванными и, если для них есть
+  // факт про Антона, кликабельны.
+  const totalDays = Math.round((target - CALENDAR_START) / DAY_MS) + 1;
+  const cells = Array.from({ length: Math.max(totalDays, 0) }, (_, i) => {
+    const d = new Date(CALENDAR_START.getTime() + i * DAY_MS);
     const isTarget = d.getTime() === target.getTime();
+    const isPast = d.getTime() <= today.getTime();
+    const key = dateKey(d);
+    const hasFact = isPast && DAILY_FACTS[key];
     const dayContent = isTarget
       ? `<span class="calendar-cell-confetti">🎉</span><span class="calendar-cell-daynum">${d.getDate()}</span>`
       : d.getDate();
+    const classes = ["calendar-cell", isTarget && "calendar-cell-target", isPast && "calendar-cell-past"].filter(Boolean).join(" ");
     return `
-      <div class="calendar-cell${isTarget ? " calendar-cell-target" : ""}">
+      <div class="${classes}"${hasFact ? ` data-fact-date="${key}"` : ""}>
         <div class="calendar-cell-dow">${isTarget ? MONTH_SHORT[d.getMonth()] : DOW_SHORT[d.getDay()]}</div>
         <div class="calendar-cell-day">${dayContent}</div>
       </div>
@@ -173,6 +201,42 @@ function renderCountdown(){
   el.innerHTML = `
     <div class="calendar-row">${cells}<div class="countdown-label">${label}</div></div>
   `;
+
+  el.querySelectorAll(".calendar-cell[data-fact-date]").forEach(cell => {
+    cell.addEventListener("click", () => openFactModal(cell.dataset.factDate));
+  });
+}
+
+// Простой попап с фактом про Антона на конкретный день.
+function openFactModal(key){
+  const fact = DAILY_FACTS[key];
+  if(!fact) return;
+  const [y, m, d] = key.split("-").map(Number);
+  openModal(`
+    <h3>${d} ${MONTH_SHORT[m - 1]}</h3>
+    <p class="intro-text">${escapeHtml(fact)}</p>
+    <div class="modal-actions modal-actions-center">
+      <button id="factCloseBtn">Понятно!</button>
+    </div>
+  `, overlay => {
+    overlay.querySelector("#factCloseBtn").addEventListener("click", closeModal);
+  }, { closeOnBackdrop: true });
+}
+
+// При первом заходе в новый день сам показываем факт, который только что "открылся" —
+// как с попапом-подсказкой, но per-day, а не одноразово.
+function maybeShowDailyFact(){
+  if(IS_ADMIN) return;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if(today < CALENDAR_START) return;
+  const target = getBirthdayTarget(today);
+  const latestOpened = today < target ? today : target;
+  const key = dateKey(latestOpened);
+  if(!DAILY_FACTS[key]) return;
+  if(localStorage.getItem(LS.dailyFactSeen) === key) return;
+  openFactModal(key);
+  localStorage.setItem(LS.dailyFactSeen, key);
 }
 
 function initCountdown(){
@@ -1324,7 +1388,12 @@ export function initApp(opts){
   }else{
     renderTopContacts();
     $("#infoBtn")?.addEventListener("click", openIntroModal);
+    // openModal() закрывает предыдущий попап, так что оба сразу показать нельзя — в самый
+    // первый визит приоритет у интро (объясняет весь сайт), факт дня просто пропускаем: он
+    // не отметится "показанным" и всплывёт сам при следующем заходе.
+    const introAlreadySeen = !!localStorage.getItem(LS.introSeen);
     maybeShowIntro();
+    if(introAlreadySeen) maybeShowDailyFact();
   }
   watchItems();
   loadRates();
