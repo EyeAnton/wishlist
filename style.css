@@ -105,6 +105,28 @@ header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; g
 /* Шапка попапа с фактом — тот же календарик-клетка слева, подпись справа от него. */
 .fact-popup-header{display:flex; align-items:center; gap:12px; margin-bottom:14px;}
 .fact-popup-title{font-weight:700; font-size:1.05rem; color:var(--text);}
+/* Текст факта у гостя — уже готовый HTML (жирность/выравнивание задаёт владелец в редакторе). */
+.fact-popup-body{color:var(--text); font-size:.92rem; line-height:1.42;}
+.fact-popup-body p{margin:0 0 9px;}
+.fact-popup-body p:last-child{margin-bottom:0;}
+/* Редактор факта у владельца — тот же вид, что .field textarea, но contenteditable-div. */
+.field-richtext{
+  width:100%; min-height:140px; padding:10px 12px; border:1px solid var(--border); border-radius:8px;
+  background-color:var(--input-bg); color:var(--text); font:inherit; overflow:auto;
+}
+.field-richtext:focus{outline:2px solid var(--accent-solid); outline-offset:-1px;}
+.field-richtext p{margin:0 0 9px;}
+.field-richtext p:last-child{margin-bottom:0;}
+/* Плавающее мини-меню жирности/выравнивания — появляется у выделенного текста в редакторе. */
+.rt-toolbar{
+  position:fixed; display:flex; gap:4px; background:var(--modal-bg); border:1px solid var(--border);
+  border-radius:8px; padding:4px; box-shadow:var(--shadow); z-index:300;
+}
+.rt-toolbar button{
+  padding:5px 9px; font-size:.85rem; line-height:1; background:var(--input-bg); color:var(--text);
+  border-radius:6px;
+}
+.rt-toolbar button:hover{background:var(--accent-solid); color:#fff;}
 
 /* тумблер темы: скруглённый прямоугольник + кружок, который едет по клику.
    Солнце и луна нарисованы векторно и лежат по краям трека — тумблер-кружок

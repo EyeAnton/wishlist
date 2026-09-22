@@ -152,12 +152,12 @@ const CALENDAR_START = new Date(2026, 8, 22);
 // клику на уже прошедшую (оторванную) клетку. Реальные факты редактируются владельцем прямо на
 // сайте (см. openFactEditModal) и хранятся в Firebase — этот объект лишь подстраховка на случай,
 // если в базе для сегодняшнего дня ещё пусто.
+// Значение — HTML (владелец форматирует текст жирностью/выравниванием через редактор).
 const DEFAULT_DAILY_FACTS = {
-  "2026-09-22": [
-    "За 2026 год потратил на настолки $370 и уделил этому более 120 часов 🎲",
-    "Допускаю, что всё начиналось с лото. Мы играли в лото, когда собирались всей семьёй у бабушки в гостях — мы доставали деревянные бочонки, а бабушка с особым азартом выкрикивала номера: «22 — утята!»",
-    "Так что для меня настолки с детства — это не просто красивые картонки. Это возможность привнести в жизнь счастье, весёлое общение и светлую атмосферу.",
-  ],
+  "2026-09-22":
+    "<p>За 2026 год потратил на настолки $370 и уделил этому более 120 часов 🎲</p>" +
+    "<p>Допускаю, что всё начиналось с лото. Мы играли в лото, когда собирались всей семьёй у бабушки в гостях — мы доставали деревянные бочонки, а бабушка с особым азартом выкрикивала номера: «22 — утята!»</p>" +
+    "<p>Так что для меня настолки с детства — это не просто красивые картонки. Это возможность привнести в жизнь счастье, весёлое общение и светлую атмосферу.</p>",
 };
 let DAILY_FACTS = { ...DEFAULT_DAILY_FACTS };
 
@@ -219,10 +219,11 @@ function renderCountdown(){
 }
 
 // Простой попап с фактом про Антона на конкретный день. Дата показана тем же
-// календариком-клеткой, что и в самом счётчике — для узнаваемости.
+// календариком-клеткой, что и в самом счётчике — для узнаваемости. Текст — уже готовый HTML
+// (форматирование задаёт владелец в редакторе), поэтому вставляем как есть, без экранирования.
 function openFactModal(key){
-  const paragraphs = DAILY_FACTS[key];
-  if(!paragraphs) return;
+  const html = DAILY_FACTS[key];
+  if(!html) return;
   const [y, m, d] = key.split("-").map(Number);
   openModal(`
     <div class="fact-popup-header">
@@ -232,7 +233,7 @@ function openFactModal(key){
       </div>
       <div class="fact-popup-title">Сегодняшний факт про меня:</div>
     </div>
-    ${paragraphs.map(p => `<p class="intro-text">${escapeHtml(p)}</p>`).join("")}
+    <div class="fact-popup-body">${html}</div>
     <div class="modal-actions modal-actions-center">
       <button id="factCloseBtn">Понятно!</button>
     </div>
@@ -242,10 +243,11 @@ function openFactModal(key){
 }
 
 // Админка "на коленке": владелец кликает по любой клетке (не только прошедшей) и сразу видит и
-// правит текст факта — без обращения к разработчику. Абзацы разделяются пустой строкой, как и
-// при показе гостям.
+// правит текст факта — без обращения к разработчику. Редактор — contenteditable вместо textarea,
+// чтобы можно было выделить текст и применить жирность/выравнивание через всплывающее мини-меню
+// (см. .rt-toolbar ниже), а не только вводить голый текст.
 function openFactEditModal(key){
-  const paragraphs = DAILY_FACTS[key] || [];
+  const html = DAILY_FACTS[key] || "";
   const [y, m, d] = key.split("-").map(Number);
   openModal(`
     <div class="fact-popup-header">
@@ -257,16 +259,60 @@ function openFactEditModal(key){
     </div>
     <div class="field">
       <label>Текст</label>
-      <textarea id="factText" rows="7" placeholder="Пустая строка между абзацами — новый абзац">${escapeHtml(paragraphs.join("\n\n"))}</textarea>
+      <div id="factText" class="field-richtext" contenteditable="true">${html || "<p><br></p>"}</div>
+      <small>Выделите текст — появится мини-меню с жирностью и выравниванием.</small>
     </div>
     <div class="error-text" id="factEditError"></div>
     <div class="modal-actions">
-      ${paragraphs.length ? '<button class="danger left" id="factDeleteBtn">Удалить</button>' : ""}
+      ${html ? '<button class="danger left" id="factDeleteBtn">Удалить</button>' : ""}
       <button class="secondary" id="factCancelBtn">Отмена</button>
       <button id="factSaveBtn">Сохранить</button>
     </div>
   `, overlay => {
-    overlay.querySelector("#factText").focus();
+    const editor = overlay.querySelector("#factText");
+    try{ document.execCommand("defaultParagraphSeparator", false, "p"); }catch(e){ /* старые браузеры просто продолжат с div */ }
+    editor.focus();
+
+    // Мини-меню жирности/выравнивания над выделением. Кнопки ловят mousedown с preventDefault,
+    // иначе клик по кнопке сначала снимает выделение в редакторе (фокус уходит на кнопку) — и
+    // execCommand применяется уже не к тому, что выделяли.
+    let toolbar = null;
+    const removeToolbar = () => { toolbar?.remove(); toolbar = null; };
+    const updateToolbar = () => {
+      if(!document.body.contains(editor)){
+        document.removeEventListener("selectionchange", updateToolbar);
+        removeToolbar();
+        return;
+      }
+      const sel = window.getSelection();
+      if(!sel || sel.isCollapsed || sel.rangeCount === 0 || !editor.contains(sel.anchorNode)){
+        removeToolbar();
+        return;
+      }
+      const rect = sel.getRangeAt(0).getBoundingClientRect();
+      if(!toolbar){
+        toolbar = document.createElement("div");
+        toolbar.className = "rt-toolbar";
+        toolbar.innerHTML = `
+          <button type="button" data-cmd="bold" title="Жирный"><b>Ж</b></button>
+          <button type="button" data-cmd="justifyLeft" title="По левому краю">⟸</button>
+          <button type="button" data-cmd="justifyCenter" title="По центру">⟺</button>
+          <button type="button" data-cmd="justifyRight" title="По правому краю">⟹</button>
+        `;
+        overlay.appendChild(toolbar);
+        toolbar.querySelectorAll("button").forEach(btn => {
+          btn.addEventListener("mousedown", e => e.preventDefault());
+          btn.addEventListener("click", () => {
+            document.execCommand(btn.dataset.cmd);
+            updateToolbar();
+          });
+        });
+      }
+      toolbar.style.left = Math.round(rect.left + rect.width / 2 - toolbar.offsetWidth / 2) + "px";
+      toolbar.style.top = Math.round(rect.top - toolbar.offsetHeight - 8) + "px";
+    };
+    document.addEventListener("selectionchange", updateToolbar);
+
     overlay.querySelector("#factCancelBtn").addEventListener("click", closeModal);
     overlay.querySelector("#factDeleteBtn")?.addEventListener("click", async () => {
       if(!confirm("Удалить факт на этот день?")) return;
@@ -277,13 +323,12 @@ function openFactEditModal(key){
       });
     });
     overlay.querySelector("#factSaveBtn").addEventListener("click", async () => {
-      const text = overlay.querySelector("#factText").value.trim();
-      if(!text){
+      if(!editor.textContent.trim()){
         overlay.querySelector("#factEditError").textContent = "Введите текст факта";
         return;
       }
       await withLoadingButton(overlay.querySelector("#factSaveBtn"), async () => {
-        await set(factRef(key), text);
+        await set(factRef(key), editor.innerHTML.trim());
         closeModal();
         showToast("Факт сохранён");
       });
@@ -1451,9 +1496,9 @@ function watchItems(){
   });
 }
 
-// Живая подписка на факты дня — хранятся в Firebase как обычные строки (пустая строка между
-// строк = новый абзац), редактируются владельцем прямо на сайте (openFactEditModal). Пока не
-// подгрузились (или их там ещё нет) — используем захардкоженный DEFAULT_DAILY_FACTS.
+// Живая подписка на факты дня — хранятся в Firebase как HTML (см. openFactEditModal),
+// редактируются владельцем прямо на сайте. Пока не подгрузились (или их там ещё нет) —
+// используем захардкоженный DEFAULT_DAILY_FACTS.
 let introAlreadySeenAtStart = false;
 let dailyFactAutoCheckDone = false;
 function maybeRunDailyFactAutoCheck(){
@@ -1467,8 +1512,8 @@ function watchFacts(){
     const val = snap.val() || {};
     const fromDb = {};
     Object.keys(val).forEach(key => {
-      const paragraphs = String(val[key] || "").split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
-      if(paragraphs.length) fromDb[key] = paragraphs;
+      const html = String(val[key] || "").trim();
+      if(html) fromDb[key] = html;
     });
     DAILY_FACTS = { ...DEFAULT_DAILY_FACTS, ...fromDb };
     renderCountdown();
