@@ -151,8 +151,13 @@ const CALENDAR_START = new Date(2026, 8, 22);
 // Факт про Антона на каждый день — открывается в свой день (ключ "YYYY-MM-DD"), доступен по
 // клику на уже прошедшую (оторванную) клетку. Новых фактов пока нет — добавляются сюда по мере
 // приближения дня.
+// Значение — массив абзацев (рендерятся отдельными <p>).
 const DAILY_FACTS = {
-  "2026-09-22": "За 2026 год потратил на настолки 370 долларов 🎲",
+  "2026-09-22": [
+    "За 2026 год потратил на настолки $370 и уделил этому более 120 часов 🎲",
+    "Допускаю, что всё начиналось с лото. Мы играли в лото, когда собирались всей семьёй у бабушки в гостях — мы доставали деревянные бочонки, а бабушка с особым азартом выкрикивала номера: «22 — утята!»",
+    "Так что для меня настолки с детства — это не просто красивые картонки. Это возможность привнести в жизнь счастье, весёлое общение и светлую атмосферу.",
+  ],
 };
 
 function dateKey(d){
@@ -207,14 +212,21 @@ function renderCountdown(){
   });
 }
 
-// Простой попап с фактом про Антона на конкретный день.
+// Простой попап с фактом про Антона на конкретный день. Дата показана тем же
+// календариком-клеткой, что и в самом счётчике — для узнаваемости.
 function openFactModal(key){
-  const fact = DAILY_FACTS[key];
-  if(!fact) return;
+  const paragraphs = DAILY_FACTS[key];
+  if(!paragraphs) return;
   const [y, m, d] = key.split("-").map(Number);
   openModal(`
-    <h3>${d} ${MONTH_SHORT[m - 1]}</h3>
-    <p class="intro-text">${escapeHtml(fact)}</p>
+    <div class="fact-popup-header">
+      <div class="calendar-cell">
+        <div class="calendar-cell-dow">${MONTH_SHORT[m - 1]}</div>
+        <div class="calendar-cell-day">${d}</div>
+      </div>
+      <div class="fact-popup-title">Сегодняшний факт про меня:</div>
+    </div>
+    ${paragraphs.map(p => `<p class="intro-text">${escapeHtml(p)}</p>`).join("")}
     <div class="modal-actions modal-actions-center">
       <button id="factCloseBtn">Понятно!</button>
     </div>
