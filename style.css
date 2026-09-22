@@ -96,9 +96,11 @@ header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; g
 }
 .calendar-cell-daynum{position:relative; z-index:1;}
 /* Прошедшие дни (включая сегодняшний — его факт уже открыт) выглядят слегка оторванными:
-   наклон + лёгкое затемнение. Кликабельны только те, для которых есть факт про Антона. */
+   наклон + лёгкое затемнение. Кликабельны те, для которых есть факт про Антона — а для
+   владельца (редактирование фактов) кликабельны вообще все клетки, не только прошедшие. */
 .calendar-cell-past{transform:rotate(-6deg); opacity:.72; transition:opacity .15s;}
-.calendar-cell-past[data-fact-date]{cursor:pointer;}
+.calendar-cell[data-fact-date]{cursor:pointer; transition:opacity .15s;}
+.calendar-cell[data-fact-date]:hover{opacity:.8;}
 .calendar-cell-past[data-fact-date]:hover{opacity:1;}
 /* Шапка попапа с фактом — тот же календарик-клетка слева, подпись справа от него. */
 .fact-popup-header{display:flex; align-items:center; gap:12px; margin-bottom:14px;}
