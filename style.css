@@ -60,6 +60,9 @@ header.topbar{
   margin-bottom:24px;
 }
 header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; gap:10px; color:var(--text);}
+/* Переключатель темы сидит сразу справа от названия сайта, а не в дальнем углу шапки — на
+   мобилке это экономит место в правой части, где живут контакты и остальные кнопки. */
+.topbar-title{display:flex; align-items:center; gap:12px;}
 .countdown-hero{max-width:480px; margin:0 auto 24px; text-align:center;}
 .countdown-hero .countdown-label{font-size:1.05rem; font-weight:600; color:var(--text); margin-bottom:8px;}
 .countdown-hero .countdown-bar{height:14px; border-radius:7px;}
@@ -149,6 +152,7 @@ button:disabled{opacity:.55; cursor:not-allowed;}
   box-shadow:var(--shadow); padding:12px 14px;
 }
 .filter-chip{display:inline-flex; align-items:center; gap:8px; font-size:.9rem; color:var(--text); cursor:pointer; user-select:none;}
+.marketplace-label-short{display:none;}
 .filter-chip input{accent-color:var(--accent-solid); width:15px; height:15px; cursor:pointer; margin:0;}
 .grid{
   display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:18px;
@@ -280,4 +284,13 @@ button:disabled{opacity:.55; cursor:not-allowed;}
   .full-btn{font-size:.8rem; padding:8px 6px;}
   .reserved-badge{font-size:.72rem; padding:5px 7px;}
   .owner-actions button{padding:5px 7px; font-size:.78rem;}
+  /* Валюту на мобилке прячем целиком (места мало, а конвертация не главное), сокращаем текст
+     галочки Ozon/WB и ужимаем остальные фильтры — чтобы вся панель влезла в одну строку. */
+  #currencyDropdown{display:none;}
+  .marketplace-label-full{display:none;}
+  .marketplace-label-short{display:inline;}
+  .filters-bar{padding:9px 10px; gap:8px;}
+  .dropdown-check-toggle{padding:7px 9px; font-size:.82rem; gap:5px;}
+  .dropdown-check-arrow{width:9px; height:9px;}
+  .marketplace-filter{font-size:.82rem; gap:5px;}
 }

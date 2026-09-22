@@ -71,7 +71,7 @@ document.addEventListener("click", e => {
 });
 
 const NO_CATEGORY = "Без категории";
-const FIXED_CATEGORIES = ["Девайсы", "Настолки", "Кофе", "Подписки", "Книги", "Одежда", "Хобби"];
+const FIXED_CATEGORIES = ["Вайбкодинг", "Настолки", "Кофе", "Подписки", "Книги", "Одежда", "Хобби"];
 
 function categoryOf(item){
   return (item.category && item.category.trim()) ? item.category.trim() : NO_CATEGORY;
@@ -1053,9 +1053,10 @@ function renderMain(){
           `).join("")}
         </div>
       </details>
-      <label class="filter-chip">
+      <label class="filter-chip marketplace-filter">
         <input type="checkbox" id="onlyMarketplaceCheckbox" ${state.onlyMarketplace ? "checked" : ""}>
-        Можно купить на Ozon/WB
+        <span class="marketplace-label-full">Можно купить на Ozon/WB</span>
+        <span class="marketplace-label-short">Ozon/WB</span>
       </label>
     </div>
   `;
