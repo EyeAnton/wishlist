@@ -709,6 +709,75 @@ function openItemModal(existingItem){
   });
 }
 
+// Лёгкая конфетти на canvas без внешних библиотек/JSON-ассетов — визуально тот же эффект,
+// что даёт lottie-анимация конфетти, но без веса lottie-web и риска, что хот-линкнутый файл
+// когда-нибудь пропадёт.
+function launchConfetti(canvas){
+  const ctx = canvas.getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  const w = window.innerWidth, h = window.innerHeight;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + "px";
+  canvas.style.height = h + "px";
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const colors = ["#e8823f", "#ff9d54", "#6b4fa3", "#3fa672", "#d9455f", "#ffd166", "#4cc98a"];
+  const pieces = Array.from({ length: 140 }, () => ({
+    x: Math.random() * w,
+    y: -20 - Math.random() * h * 0.6,
+    size: 6 + Math.random() * 6,
+    color: colors[Math.floor(Math.random() * colors.length)],
+    speed: 2 + Math.random() * 3,
+    drift: (Math.random() - 0.5) * 2,
+    rotation: Math.random() * 360,
+    rotSpeed: (Math.random() - 0.5) * 12,
+  }));
+
+  let frame = 0;
+  const totalFrames = 220; // ~3.5с при 60fps
+  function tick(){
+    ctx.clearRect(0, 0, w, h);
+    pieces.forEach(p => {
+      p.y += p.speed;
+      p.x += p.drift;
+      p.rotation += p.rotSpeed;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rotation * Math.PI / 180);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+      ctx.restore();
+    });
+    frame++;
+    if(frame < totalFrames && document.body.contains(canvas)) requestAnimationFrame(tick);
+    else ctx.clearRect(0, 0, w, h);
+  }
+  requestAnimationFrame(tick);
+}
+
+// Большой попап-благодарность поверх всего экрана после успешной брони — конфетти на весь
+// экран + тёплый текст. Закрывается по клику, по кнопке или сам через несколько секунд.
+function showThanksPopup(){
+  const overlay = document.createElement("div");
+  overlay.className = "thanks-overlay";
+  overlay.innerHTML = `
+    <canvas class="thanks-confetti"></canvas>
+    <div class="thanks-card">
+      <div class="thanks-emoji">🎉</div>
+      <h2>Огромное спасибо!</h2>
+      <p>С большим удовольствием жду сюрприз 🎁 и обязательно запишу видео-распаковку, чтобы вы увидели мои эмоции!</p>
+      <button class="secondary" id="thanksCloseBtn">Закрыть</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  launchConfetti(overlay.querySelector(".thanks-confetti"));
+  const close = () => overlay.remove();
+  overlay.querySelector("#thanksCloseBtn").addEventListener("click", close);
+  overlay.addEventListener("click", e => { if(e.target === overlay) close(); });
+  setTimeout(close, 5000);
+}
+
 function openReserveModal(item){
   openModal(`
     <h3>Хочу подарить «${escapeHtml(item.title)}»</h3>
@@ -739,7 +808,7 @@ function openReserveModal(item){
           if(current && current.reservedBy) throw new Error("Этот подарок уже хотят подарить");
           await update(itemRef(item.id), { reservedBy: name });
           closeModal();
-          showToast("Записали! Спасибо 🎉");
+          showThanksPopup();
         }catch(e){
           overlay.querySelector("#reserveError").textContent = e.message;
         }
@@ -822,6 +891,9 @@ function openDetailModal(item){
       actions.innerHTML = `<button class="secondary" id="detailClose">Закрыть</button><button id="detailEdit">✎ Редактировать</button>`;
       actions.querySelector("#detailEdit").addEventListener("click", () => openItemModal(item));
     }else if(state.canSeeNames){
+      actions.innerHTML = `<button class="secondary" id="detailClose">Закрыть</button>`;
+    }else if(IS_ADMIN){
+      // До входа на админ-странице — то же самое, никакой брони.
       actions.innerHTML = `<button class="secondary" id="detailClose">Закрыть</button>`;
     }else if(item.reservedBy){
       actions.innerHTML = `<button class="secondary" id="detailClose">Закрыть</button><button class="ghost" id="detailCancel">не я / отменить</button>`;
@@ -1143,6 +1215,9 @@ function renderCardFooter(item){
     if(!item.reservedBy) return `<span style="color:var(--muted);font-size:.85rem;">Свободно</span>`;
     return `<span class="reserved-badge">🎁 Хотят подарить: ${escapeHtml(item.reservedBy)}</span>`;
   }
+  // На админ-странице до входа владельца/хелпера бронировать нечем — это переходное состояние,
+  // а не гостевой просмотр, так что кнопки "Хочу подарить" тут вообще быть не должно.
+  if(IS_ADMIN) return "";
   if(item.reservedBy){
     // Имя не показываем гостям — его же нужно ввести, чтобы отменить. Покажи мы его тут,
     // любой гость мог бы подсмотреть и отменить чужую отметку.
