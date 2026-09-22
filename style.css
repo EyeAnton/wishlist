@@ -1,6 +1,6 @@
 :root{
   --bg1:#fdf2f8; --bg2:#eef2ff;
-  --card:#edebef; --text:#2d2a3a; --muted:#8b8794;
+  --card:#ddd7e3; --text:#2d2a3a; --muted:#8b8794;
   --accent:#e8823f; --accent-solid:#e8823f; --accent-hover:#d16f2f;
   --border:#eee3ea; --ok:#3fa672; --danger:#d9455f;
   --shadow:0 4px 20px rgba(60,20,50,.08);
@@ -61,19 +61,21 @@ header.topbar{
 }
 header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; gap:10px; color:var(--text);}
 .topbar-title{display:flex; align-items:center; gap:12px;}
-.topbar-row{display:flex; align-items:center; gap:12px; flex-wrap:wrap;}
+/* width:100% обязателен: без него topbar-row как flex-item внутри header.topbar сжимается
+   по контенту и margin-left:auto ниже не имеет свободного места, чтобы прижать тему к краю. */
+.topbar-row{display:flex; align-items:center; gap:12px; flex-wrap:wrap; width:100%;}
 /* Тема прижата к правому краю через margin-left:auto — отдельно от контактов, не вплотную
    к именам, а с отступом, забирающим всё свободное место в ряду. */
 .theme-switch-end{margin-left:auto;}
-/* Календарики и подпись — в один ряд, подпись справа от клеток. */
+/* Календарики и подпись — в один ряд, подпись справа от клеток (справа от последней, даже если
+   ряд переносится на мобильных — подпись остаётся следующим элементом сразу после неё). */
 .countdown-hero{
   max-width:640px; margin:0 auto 24px; display:flex; align-items:center; justify-content:center;
-  gap:14px; flex-wrap:wrap;
 }
-.countdown-label{font-size:1.05rem; font-weight:600; color:var(--text); white-space:nowrap;}
+.countdown-label{font-size:1.05rem; font-weight:600; color:var(--text); white-space:nowrap; margin-left:8px;}
 /* Ряд мини-календариков — по одной клетке на каждый оставшийся день. Последняя (день Х)
    вместо числа показывает эмодзи-праздник вместо даты. */
-.calendar-row{display:flex; gap:6px; justify-content:center; flex-wrap:wrap;}
+.calendar-row{display:flex; align-items:center; gap:6px; justify-content:center; flex-wrap:wrap;}
 .calendar-cell{
   width:38px; display:flex; flex-direction:column; border-radius:8px; overflow:hidden;
   box-shadow:var(--shadow); background:var(--card); flex:none;
