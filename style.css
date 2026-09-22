@@ -217,8 +217,8 @@ button:disabled{opacity:.55; cursor:not-allowed;}
 .contact-link:hover{color:var(--accent-solid); text-decoration:underline;}
 /* Один общий подписи "Написать:" по центру, кнопки-контакты под ней в ряд — компактнее,
    чем повторять "Написать:" в каждой кнопке. */
-.popup-contacts{margin-top:10px; text-align:center;}
-.popup-contacts-label{font-size:.85rem; color:var(--muted); font-weight:600; margin-bottom:8px;}
+.popup-contacts{margin-top:6px; text-align:center;}
+.popup-contacts-label{font-size:.85rem; color:var(--muted); font-weight:600; margin-bottom:6px;}
 .popup-contacts-btns{display:flex; gap:10px; flex-wrap:wrap; justify-content:center;}
 .popup-contacts .contact-btn{
   display:inline-flex; align-items:center; gap:8px; font-size:.88rem; font-weight:600;
@@ -227,7 +227,7 @@ button:disabled{opacity:.55; cursor:not-allowed;}
 }
 .popup-contacts .contact-btn svg{width:16px; height:16px; flex:none;}
 .popup-contacts .contact-btn:hover{border-color:var(--accent-solid); color:var(--accent-solid); background:var(--card);}
-.intro-text{color:var(--text); font-size:.92rem; line-height:1.5; margin:0 0 9px;}
+.intro-text{color:var(--text); font-size:.92rem; line-height:1.42; margin:0 0 7px;}
 .intro-text strong{color:var(--text);}
 .reserved-badge{
   background:var(--reserved-bg); color:var(--reserved-text); font-size:.8rem; padding:6px 10px; border-radius:8px; font-weight:600;
