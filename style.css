@@ -1,6 +1,6 @@
 :root{
   --bg1:#fdf2f8; --bg2:#eef2ff;
-  --card:#edebef; --text:#2d2a3a; --muted:#8b8794;
+  --card:#ffffff; --text:#2d2a3a; --muted:#8b8794;
   --accent:#e8823f; --accent-solid:#e8823f; --accent-hover:#d16f2f;
   --border:#eee3ea; --ok:#3fa672; --danger:#d9455f;
   --shadow:0 4px 20px rgba(60,20,50,.08);
