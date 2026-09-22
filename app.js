@@ -149,16 +149,17 @@ const DAY_MS = 1000 * 60 * 60 * 24;
 const CALENDAR_START = new Date(2026, 8, 22);
 
 // Факт про Антона на каждый день — открывается в свой день (ключ "YYYY-MM-DD"), доступен по
-// клику на уже прошедшую (оторванную) клетку. Новых фактов пока нет — добавляются сюда по мере
-// приближения дня.
-// Значение — массив абзацев (рендерятся отдельными <p>).
-const DAILY_FACTS = {
+// клику на уже прошедшую (оторванную) клетку. Реальные факты редактируются владельцем прямо на
+// сайте (см. openFactEditModal) и хранятся в Firebase — этот объект лишь подстраховка на случай,
+// если в базе для сегодняшнего дня ещё пусто.
+const DEFAULT_DAILY_FACTS = {
   "2026-09-22": [
     "За 2026 год потратил на настолки $370 и уделил этому более 120 часов 🎲",
     "Допускаю, что всё начиналось с лото. Мы играли в лото, когда собирались всей семьёй у бабушки в гостях — мы доставали деревянные бочонки, а бабушка с особым азартом выкрикивала номера: «22 — утята!»",
     "Так что для меня настолки с детства — это не просто красивые картонки. Это возможность привнести в жизнь счастье, весёлое общение и светлую атмосферу.",
   ],
 };
+let DAILY_FACTS = { ...DEFAULT_DAILY_FACTS };
 
 function dateKey(d){
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -183,20 +184,22 @@ function renderCountdown(){
   // временем. У последней клетки (день Х) число остаётся на месте (иначе неясно, что это именно
   // 1 октября), а праздничный эмодзи ложится полупрозрачным фоном под цифрой. Прошедшие клетки
   // (включая сегодняшнюю — её факт уже открыт) выглядят слегка оторванными и, если для них есть
-  // факт про Антона, кликабельны.
+  // факт про Антона, кликабельны — открывают попап с текстом. Владельцу (после входа) кликабельны
+  // вообще все клетки, включая будущие без текста, — так он может писать факты заранее.
+  const canEditFacts = IS_ADMIN && state.isOwner;
   const totalDays = Math.round((target - CALENDAR_START) / DAY_MS) + 1;
   const cells = Array.from({ length: Math.max(totalDays, 0) }, (_, i) => {
     const d = new Date(CALENDAR_START.getTime() + i * DAY_MS);
     const isTarget = d.getTime() === target.getTime();
     const isPast = d.getTime() <= today.getTime();
     const key = dateKey(d);
-    const hasFact = isPast && DAILY_FACTS[key];
+    const clickable = canEditFacts || (isPast && DAILY_FACTS[key]);
     const dayContent = isTarget
       ? `<span class="calendar-cell-confetti">🎉</span><span class="calendar-cell-daynum">${d.getDate()}</span>`
       : d.getDate();
     const classes = ["calendar-cell", isTarget && "calendar-cell-target", isPast && "calendar-cell-past"].filter(Boolean).join(" ");
     return `
-      <div class="${classes}"${hasFact ? ` data-fact-date="${key}"` : ""}>
+      <div class="${classes}"${clickable ? ` data-fact-date="${key}"` : ""}>
         <div class="calendar-cell-dow">${isTarget ? MONTH_SHORT[d.getMonth()] : DOW_SHORT[d.getDay()]}</div>
         <div class="calendar-cell-day">${dayContent}</div>
       </div>
@@ -208,7 +211,10 @@ function renderCountdown(){
   `;
 
   el.querySelectorAll(".calendar-cell[data-fact-date]").forEach(cell => {
-    cell.addEventListener("click", () => openFactModal(cell.dataset.factDate));
+    cell.addEventListener("click", () => {
+      if(canEditFacts) openFactEditModal(cell.dataset.factDate);
+      else openFactModal(cell.dataset.factDate);
+    });
   });
 }
 
@@ -232,6 +238,56 @@ function openFactModal(key){
     </div>
   `, overlay => {
     overlay.querySelector("#factCloseBtn").addEventListener("click", closeModal);
+  }, { closeOnBackdrop: true });
+}
+
+// Админка "на коленке": владелец кликает по любой клетке (не только прошедшей) и сразу видит и
+// правит текст факта — без обращения к разработчику. Абзацы разделяются пустой строкой, как и
+// при показе гостям.
+function openFactEditModal(key){
+  const paragraphs = DAILY_FACTS[key] || [];
+  const [y, m, d] = key.split("-").map(Number);
+  openModal(`
+    <div class="fact-popup-header">
+      <div class="calendar-cell">
+        <div class="calendar-cell-dow">${MONTH_SHORT[m - 1]}</div>
+        <div class="calendar-cell-day">${d}</div>
+      </div>
+      <div class="fact-popup-title">Факт на этот день</div>
+    </div>
+    <div class="field">
+      <label>Текст</label>
+      <textarea id="factText" rows="7" placeholder="Пустая строка между абзацами — новый абзац">${escapeHtml(paragraphs.join("\n\n"))}</textarea>
+    </div>
+    <div class="error-text" id="factEditError"></div>
+    <div class="modal-actions">
+      ${paragraphs.length ? '<button class="danger left" id="factDeleteBtn">Удалить</button>' : ""}
+      <button class="secondary" id="factCancelBtn">Отмена</button>
+      <button id="factSaveBtn">Сохранить</button>
+    </div>
+  `, overlay => {
+    overlay.querySelector("#factText").focus();
+    overlay.querySelector("#factCancelBtn").addEventListener("click", closeModal);
+    overlay.querySelector("#factDeleteBtn")?.addEventListener("click", async () => {
+      if(!confirm("Удалить факт на этот день?")) return;
+      await withLoadingButton(overlay.querySelector("#factDeleteBtn"), async () => {
+        await remove(factRef(key));
+        closeModal();
+        showToast("Факт удалён");
+      });
+    });
+    overlay.querySelector("#factSaveBtn").addEventListener("click", async () => {
+      const text = overlay.querySelector("#factText").value.trim();
+      if(!text){
+        overlay.querySelector("#factEditError").textContent = "Введите текст факта";
+        return;
+      }
+      await withLoadingButton(overlay.querySelector("#factSaveBtn"), async () => {
+        await set(factRef(key), text);
+        closeModal();
+        showToast("Факт сохранён");
+      });
+    });
   }, { closeOnBackdrop: true });
 }
 
@@ -350,6 +406,10 @@ let db = null;
 
 function itemRef(id){
   return ref(db, "items/" + id);
+}
+
+function factRef(key){
+  return ref(db, "facts/" + key);
 }
 
 // ====== "УМНОЕ" ЗАПОЛНЕНИЕ ПО ССЫЛКЕ ======
@@ -1009,6 +1069,9 @@ async function withLoadingButton(btn, fn){
 function renderAll(){
   renderOwnerControls();
   renderMain();
+  // Пересчитываем и календарик — от него зависит, кликабельны ли клетки (владелец после входа
+  // может редактировать любую), а это меняется при смене state.isOwner.
+  renderCountdown();
 }
 
 function renderOwnerControls(){
@@ -1388,6 +1451,33 @@ function watchItems(){
   });
 }
 
+// Живая подписка на факты дня — хранятся в Firebase как обычные строки (пустая строка между
+// строк = новый абзац), редактируются владельцем прямо на сайте (openFactEditModal). Пока не
+// подгрузились (или их там ещё нет) — используем захардкоженный DEFAULT_DAILY_FACTS.
+let introAlreadySeenAtStart = false;
+let dailyFactAutoCheckDone = false;
+function maybeRunDailyFactAutoCheck(){
+  if(IS_ADMIN || dailyFactAutoCheckDone) return;
+  dailyFactAutoCheckDone = true;
+  if(introAlreadySeenAtStart) maybeShowDailyFact();
+}
+function watchFacts(){
+  if(!db){ maybeRunDailyFactAutoCheck(); return; }
+  onValue(ref(db, "facts"), snap => {
+    const val = snap.val() || {};
+    const fromDb = {};
+    Object.keys(val).forEach(key => {
+      const paragraphs = String(val[key] || "").split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+      if(paragraphs.length) fromDb[key] = paragraphs;
+    });
+    DAILY_FACTS = { ...DEFAULT_DAILY_FACTS, ...fromDb };
+    renderCountdown();
+    maybeRunDailyFactAutoCheck();
+  }, () => {
+    maybeRunDailyFactAutoCheck();
+  });
+}
+
 // ====== СТАРТ ======
 export function initApp(opts){
   IS_ADMIN = !!(opts && opts.isAdmin);
@@ -1401,12 +1491,13 @@ export function initApp(opts){
     renderTopContacts();
     $("#infoBtn")?.addEventListener("click", openIntroModal);
     // openModal() закрывает предыдущий попап, так что оба сразу показать нельзя — в самый
-    // первый визит приоритет у интро (объясняет весь сайт), факт дня просто пропускаем: он
-    // не отметится "показанным" и всплывёт сам при следующем заходе.
-    const introAlreadySeen = !!localStorage.getItem(LS.introSeen);
+    // первый визит приоритет у интро (объясняет весь сайт). Факт дня показываем только после
+    // того, как подгрузятся актуальные факты из Firebase (см. watchFacts) — иначе можно на миг
+    // показать устаревший захардкоженный текст, если владелец его уже поправил в админке.
+    introAlreadySeenAtStart = !!localStorage.getItem(LS.introSeen);
     maybeShowIntro();
-    if(introAlreadySeen) maybeShowDailyFact();
   }
   watchItems();
+  watchFacts();
   loadRates();
 }
