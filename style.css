@@ -1,6 +1,6 @@
 :root{
   --bg1:#fdf2f8; --bg2:#eef2ff;
-  --card:#ffffff; --text:#2d2a3a; --muted:#8b8794;
+  --card:#edebef; --text:#2d2a3a; --muted:#8b8794;
   --accent:#e8823f; --accent-solid:#e8823f; --accent-hover:#d16f2f;
   --border:#eee3ea; --ok:#3fa672; --danger:#d9455f;
   --shadow:0 4px 20px rgba(60,20,50,.08);
@@ -60,14 +60,17 @@ header.topbar{
   margin-bottom:24px;
 }
 header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; gap:10px; color:var(--text);}
-/* Переключатель темы сидит сразу справа от названия сайта, а не в дальнем углу шапки — на
-   мобилке это экономит место в правой части, где живут контакты и остальные кнопки. */
 .topbar-title{display:flex; align-items:center; gap:12px;}
-/* Гостевая шапка: заголовок, тема, контакты и инфо-кнопка — всё в один ряд, раз помещается. */
 .topbar-row{display:flex; align-items:center; gap:12px; flex-wrap:wrap;}
-.countdown-hero{max-width:560px; margin:0 auto 24px; text-align:center;}
-.countdown-label-row{display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:12px;}
-.countdown-label{font-size:1.05rem; font-weight:600; color:var(--text);}
+/* Тема прижата к правому краю через margin-left:auto — отдельно от контактов, не вплотную
+   к именам, а с отступом, забирающим всё свободное место в ряду. */
+.theme-switch-end{margin-left:auto;}
+/* Календарики и подпись — в один ряд, подпись справа от клеток. */
+.countdown-hero{
+  max-width:640px; margin:0 auto 24px; display:flex; align-items:center; justify-content:center;
+  gap:14px; flex-wrap:wrap;
+}
+.countdown-label{font-size:1.05rem; font-weight:600; color:var(--text); white-space:nowrap;}
 /* Ряд мини-календариков — по одной клетке на каждый оставшийся день. Последняя (день Х)
    вместо числа показывает эмодзи-праздник вместо даты. */
 .calendar-row{display:flex; gap:6px; justify-content:center; flex-wrap:wrap;}
@@ -104,7 +107,6 @@ header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; g
 }
 .theme-switch[aria-checked="true"]{background:var(--accent-solid);}
 .theme-switch[aria-checked="true"] .theme-switch-knob{transform:translateX(20px);}
-.header-controls{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
 .top-contacts{display:flex; gap:12px; align-items:center;}
 .owner-controls{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
 /* Отступ текста слева (14px) равен отступу от стрелки до правого края (тоже 14px,

@@ -151,7 +151,7 @@ function renderCountdown(){
   if(target < today) target = new Date(now.getFullYear() + 1, 9, 1);
   const dayMs = 1000 * 60 * 60 * 24;
   const daysLeft = Math.round((target - today) / dayMs);
-  const label = daysLeft <= 0 ? "Сегодня 1 октября! 🎉" : `${daysLeft} ${daysWord(daysLeft)} до 1 октября`;
+  const label = daysLeft <= 0 ? "Сегодня 1 октября! 🎉" : `Всего ${daysLeft} ${daysWord(daysLeft)}!`;
 
   // По клеточке на каждый оставшийся день, с датой внутри. Последняя клетка (день Х) —
   // с эмодзи-праздником вместо числа, чтобы сразу выделялась.
@@ -166,19 +166,10 @@ function renderCountdown(){
     `;
   }).join("");
 
-  // Кнопку "инфо" достаём из DOM перед перерисовкой (иначе innerHTML её уничтожит вместе
-  // со старым содержимым) и возвращаем на место — рядом с подписью — уже в новой разметке.
-  const infoBtn = document.getElementById("infoBtn");
-  infoBtn?.remove();
-
   el.innerHTML = `
-    <div class="countdown-label-row">
-      <div class="countdown-label">${label}</div>
-    </div>
     <div class="calendar-row">${cells}</div>
+    <div class="countdown-label">${label}</div>
   `;
-
-  if(infoBtn) el.querySelector(".countdown-label-row")?.appendChild(infoBtn);
 }
 
 function initCountdown(){
@@ -984,6 +975,11 @@ function renderMain(){
     return;
   }
 
+  // Кнопку "инфо" достаём из DOM перед перерисовкой (иначе innerHTML её уничтожит, если она уже
+  // переехала в панель фильтров на прошлом рендере) и возвращаем на место в filtersBar ниже.
+  const infoBtn = document.getElementById("infoBtn");
+  infoBtn?.remove();
+
   const categories = getAllCategories();
   // Пустой выбор категорий значит "показать всё" — отмечать нужно только то, что хочешь увидеть,
   // а не снимать галочки со всего остального.
@@ -1066,6 +1062,7 @@ function renderMain(){
           `).join("")}
         </div>
       </details>
+      ${!IS_ADMIN ? '<span id="infoBtnSlot"></span>' : ""}
       <label class="filter-chip marketplace-filter">
         <input type="checkbox" id="onlyMarketplaceCheckbox" ${state.onlyMarketplace ? "checked" : ""}>
         <span class="marketplace-label-full">Можно купить на Ozon/WB</span>
@@ -1079,6 +1076,7 @@ function renderMain(){
     : `<div class="empty-state"><h2>Ничего не найдено</h2><p>Попробуйте включить другие категории.</p></div>`;
 
   el.innerHTML = filtersBar + list;
+  if(infoBtn) el.querySelector("#infoBtnSlot")?.replaceWith(infoBtn);
 
   el.querySelectorAll(".dropdown-check").forEach(details => {
     details.addEventListener("toggle", () => {
