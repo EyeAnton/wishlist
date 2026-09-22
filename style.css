@@ -213,7 +213,7 @@ button:disabled{opacity:.55; cursor:not-allowed;}
 .contact-link{font-size:.8rem; color:var(--muted); text-decoration:none; display:inline-flex; align-items:center; gap:4px;}
 .contact-link svg{width:14px; height:14px; flex:none;}
 .contact-link:hover{color:var(--accent-solid); text-decoration:underline;}
-.popup-contacts{display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;}
+.popup-contacts{display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;}
 .popup-contacts .contact-btn{
   display:inline-flex; align-items:center; gap:8px; font-size:.88rem; font-weight:600;
   padding:10px 14px; border-radius:10px; background:var(--input-bg); border:1px solid var(--border);
@@ -221,7 +221,7 @@ button:disabled{opacity:.55; cursor:not-allowed;}
 }
 .popup-contacts .contact-btn svg{width:16px; height:16px; flex:none;}
 .popup-contacts .contact-btn:hover{border-color:var(--accent-solid); color:var(--accent-solid); background:var(--card);}
-.intro-text{color:var(--text); font-size:.92rem; line-height:1.55; margin:0 0 12px;}
+.intro-text{color:var(--text); font-size:.92rem; line-height:1.5; margin:0 0 9px;}
 .intro-text strong{color:var(--text);}
 .reserved-badge{
   background:var(--reserved-bg); color:var(--reserved-text); font-size:.8rem; padding:6px 10px; border-radius:8px; font-weight:600;
@@ -242,7 +242,7 @@ button:disabled{opacity:.55; cursor:not-allowed;}
   box-shadow:0 10px 40px rgba(0,0,0,.3); max-height:90vh; overflow:auto; color:var(--text);
 }
 .modal.modal-wide{max-width:640px;}
-.modal h3{margin-top:0;}
+.modal h3{margin:0 0 10px;}
 .detail-main-img{
   width:100%; aspect-ratio:4/3; background:var(--card-img-bg); border-radius:12px; overflow:hidden;
   display:flex; align-items:center; justify-content:center; font-size:3rem; margin-bottom:10px;
