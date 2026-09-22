@@ -760,7 +760,8 @@ function launchConfetti(canvas){
 }
 
 // Большой попап-благодарность поверх всего экрана после успешной брони — конфетти на весь
-// экран + тёплый текст. Закрывается по клику, по кнопке или сам через несколько секунд.
+// экран + тёплый текст. Закрывается только по клику/кнопке — таймаута нет, висит, пока
+// пользователь сам не закроет.
 function showThanksPopup(){
   const overlay = document.createElement("div");
   overlay.className = "thanks-overlay";
@@ -778,7 +779,6 @@ function showThanksPopup(){
   const close = () => overlay.remove();
   overlay.querySelector("#thanksCloseBtn").addEventListener("click", close);
   overlay.addEventListener("click", e => { if(e.target === overlay) close(); });
-  setTimeout(close, 5000);
 }
 
 function openReserveModal(item){
@@ -1133,14 +1133,40 @@ function renderMain(){
       const cardImgBox = card.querySelector(".card-img");
       const mainImg = cardImgBox.querySelector(".card-img-main");
       const dots = Array.from(cardImgBox.querySelectorAll(".card-img-dot"));
-      cardImgBox.addEventListener("mousemove", e => {
-        const rect = cardImgBox.getBoundingClientRect();
-        const ratio = (e.clientX - rect.left) / rect.width;
+      const showByRatio = ratio => {
         const idx = Math.min(cardImages.length - 1, Math.max(0, Math.floor(ratio * cardImages.length)));
         mainImg.src = cardImages[idx];
         dots.forEach((dot, i) => dot.classList.toggle("active", i === idx));
+      };
+      cardImgBox.addEventListener("mousemove", e => {
+        const rect = cardImgBox.getBoundingClientRect();
+        showByRatio((e.clientX - rect.left) / rect.width);
       });
       // При уходе курсора ничего не сбрасываем — так и должна остаться последняя показанная фотография.
+
+      // На мобильных мыши нет — свайп по фото листает картинки так же, как наведение на десктопе.
+      // Гейтим на горизонтальность жеста, чтобы не мешать обычному вертикальному скроллу страницы,
+      // и гасим клик по карточке после свайпа, чтобы не открывалась детальная карточка товара.
+      let touchStartX = 0, touchStartY = 0, swiping = false, justSwiped = false;
+      cardImgBox.addEventListener("touchstart", e => {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        swiping = false;
+      }, { passive: true });
+      cardImgBox.addEventListener("touchmove", e => {
+        const dx = e.touches[0].clientX - touchStartX;
+        const dy = e.touches[0].clientY - touchStartY;
+        if(!swiping && Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 8) swiping = true;
+        if(swiping){
+          e.preventDefault();
+          const rect = cardImgBox.getBoundingClientRect();
+          showByRatio((e.touches[0].clientX - rect.left) / rect.width);
+        }
+      }, { passive: false });
+      cardImgBox.addEventListener("touchend", () => { if(swiping) justSwiped = true; });
+      cardImgBox.addEventListener("click", e => {
+        if(justSwiped){ e.stopPropagation(); justSwiped = false; }
+      });
     }
     if(state.isOwner){
       card.querySelector(".editBtn")?.addEventListener("click", () => openItemModal(item));
@@ -1176,7 +1202,7 @@ function openIntroModal(){
   openModal(`
     <h3>🎁 Вишлист Антона</h3>
     <p class="intro-text">Здесь — то, что его порадует. Выбирайте на свой вкус!</p>
-    <p class="intro-text"><strong>Как забронировать</strong><br>Нажмите «Хочу подарить», впишите имя — его увидите только вы.<br>Антон брони не видит, сюрприз останется сюрпризом 🤫</p>
+    <p class="intro-text"><strong>Как забронировать</strong><br>Нажмите «Хочу подарить»,<br>впишите имя — его увидите только вы.<br>Антон брони не видит, сюрприз останется сюрпризом 🤫</p>
     <p class="intro-text"><strong>Если передумали</strong><br>Нажмите «Отменить» на выбранном подарке, введите своё имя.</p>
     <p class="intro-text"><strong>Есть вопросы?</strong><br>Пишите Лере — подскажет по размеру, цвету и другим деталям.<br>Антону тоже можно написать напрямую 😉</p>
     <div class="popup-contacts">
