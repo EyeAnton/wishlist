@@ -139,6 +139,9 @@ function daysWord(n){
   return "дней";
 }
 
+const DOW_SHORT = ["ВС", "ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ"];
+const MONTH_SHORT = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+
 function renderCountdown(){
   const el = $("#countdown");
   if(!el) return;
@@ -148,22 +151,34 @@ function renderCountdown(){
   if(target < today) target = new Date(now.getFullYear() + 1, 9, 1);
   const dayMs = 1000 * 60 * 60 * 24;
   const daysLeft = Math.round((target - today) / dayMs);
-  // Клеток ровно столько, сколько дней осталось — без "пустого" хвоста за уже прошедшие дни.
-  const cellCount = Math.max(daysLeft, 1);
-
-  const ticks = Array.from({ length: cellCount - 1 }, (_, i) =>
-    `<span class="countdown-tick" style="left:${((i + 1) / cellCount) * 100}%"></span>`
-  ).join("");
-
   const label = daysLeft <= 0 ? "Сегодня 1 октября! 🎉" : `${daysLeft} ${daysWord(daysLeft)} до 1 октября`;
 
+  // По клеточке на каждый оставшийся день, с датой внутри. Последняя клетка (день Х) —
+  // с эмодзи-праздником вместо числа, чтобы сразу выделялась.
+  const cells = Array.from({ length: Math.max(daysLeft, 0) }, (_, i) => {
+    const d = new Date(today.getTime() + (i + 1) * dayMs);
+    const isTarget = d.getTime() === target.getTime();
+    return `
+      <div class="calendar-cell${isTarget ? " calendar-cell-target" : ""}">
+        <div class="calendar-cell-dow">${isTarget ? MONTH_SHORT[d.getMonth()] : DOW_SHORT[d.getDay()]}</div>
+        <div class="calendar-cell-day">${isTarget ? "🎉" : d.getDate()}</div>
+      </div>
+    `;
+  }).join("");
+
+  // Кнопку "инфо" достаём из DOM перед перерисовкой (иначе innerHTML её уничтожит вместе
+  // со старым содержимым) и возвращаем на место — рядом с подписью — уже в новой разметке.
+  const infoBtn = document.getElementById("infoBtn");
+  infoBtn?.remove();
+
   el.innerHTML = `
-    <div class="countdown-label">${label}</div>
-    <div class="countdown-bar" title="${escapeHtml(label)}">
-      <div class="countdown-bar-fill" style="width:100%"></div>
-      ${ticks}
+    <div class="countdown-label-row">
+      <div class="countdown-label">${label}</div>
     </div>
+    <div class="calendar-row">${cells}</div>
   `;
+
+  if(infoBtn) el.querySelector(".countdown-label-row")?.appendChild(infoBtn);
 }
 
 function initCountdown(){
