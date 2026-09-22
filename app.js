@@ -153,15 +153,19 @@ function renderCountdown(){
   const daysLeft = Math.round((target - today) / dayMs);
   const label = daysLeft <= 0 ? "Сегодня 1 октября! 🎉" : `Осталось ${daysLeft} ${daysWord(daysLeft)}!`;
 
-  // По клеточке на каждый оставшийся день, с датой внутри. Последняя клетка (день Х) —
-  // с эмодзи-праздником вместо числа, чтобы сразу выделялась.
+  // По клеточке на каждый оставшийся день, с датой внутри. У последней клетки (день Х) число
+  // остаётся на месте (иначе неясно, что это именно 1 октября), а праздничный эмодзи ложится
+  // полупрозрачным фоном под цифрой, чтобы день сразу бросался в глаза.
   const cells = Array.from({ length: Math.max(daysLeft, 0) }, (_, i) => {
     const d = new Date(today.getTime() + (i + 1) * dayMs);
     const isTarget = d.getTime() === target.getTime();
+    const dayContent = isTarget
+      ? `<span class="calendar-cell-confetti">🎉</span><span class="calendar-cell-daynum">${d.getDate()}</span>`
+      : d.getDate();
     return `
       <div class="calendar-cell${isTarget ? " calendar-cell-target" : ""}">
         <div class="calendar-cell-dow">${isTarget ? MONTH_SHORT[d.getMonth()] : DOW_SHORT[d.getDay()]}</div>
-        <div class="calendar-cell-day">${isTarget ? "🎉" : d.getDate()}</div>
+        <div class="calendar-cell-day">${dayContent}</div>
       </div>
     `;
   }).join("");

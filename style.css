@@ -87,7 +87,14 @@ header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; g
 .calendar-cell-day{color:var(--text); font-size:1.05rem; font-weight:700; text-align:center; padding:6px 0 7px;}
 .calendar-cell-target{box-shadow:0 0 0 2px var(--accent-solid), var(--shadow);}
 .calendar-cell-target .calendar-cell-dow{background:var(--accent-hover);}
-.calendar-cell-target .calendar-cell-day{font-size:1.2rem;}
+.calendar-cell-target .calendar-cell-day{font-size:1.2rem; position:relative;}
+/* Цифра дня остаётся читаемой (иначе неясно, что это именно 1 октября), а эмодзи-салют
+   ложится полупрозрачным фоном под ней. */
+.calendar-cell-confetti{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-size:1.5em; opacity:.35; pointer-events:none;
+}
+.calendar-cell-daynum{position:relative; z-index:1;}
 
 /* тумблер темы: скруглённый прямоугольник + кружок, который едет по клику.
    Солнце и луна нарисованы векторно и лежат по краям трека — тумблер-кружок
