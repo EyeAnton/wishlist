@@ -146,15 +146,13 @@ function renderCountdown(){
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   let target = new Date(now.getFullYear(), 9, 1); // месяцы с 0 — 9 это октябрь
   if(target < today) target = new Date(now.getFullYear() + 1, 9, 1);
-  // Бар "заполняется" весь месяц перед целевой датой — с 1-го числа предыдущего месяца.
-  const start = new Date(target.getFullYear(), target.getMonth() - 1, 1);
   const dayMs = 1000 * 60 * 60 * 24;
-  const totalDays = Math.round((target - start) / dayMs);
   const daysLeft = Math.round((target - today) / dayMs);
-  const pct = Math.min(100, Math.max(0, (daysLeft / totalDays) * 100));
+  // Клеток ровно столько, сколько дней осталось — без "пустого" хвоста за уже прошедшие дни.
+  const cellCount = Math.max(daysLeft, 1);
 
-  const ticks = Array.from({ length: totalDays - 1 }, (_, i) =>
-    `<span class="countdown-tick" style="left:${((i + 1) / totalDays) * 100}%"></span>`
+  const ticks = Array.from({ length: cellCount - 1 }, (_, i) =>
+    `<span class="countdown-tick" style="left:${((i + 1) / cellCount) * 100}%"></span>`
   ).join("");
 
   const label = daysLeft <= 0 ? "Сегодня 1 октября! 🎉" : `${daysLeft} ${daysWord(daysLeft)} до 1 октября`;
@@ -162,7 +160,7 @@ function renderCountdown(){
   el.innerHTML = `
     <div class="countdown-label">${label}</div>
     <div class="countdown-bar" title="${escapeHtml(label)}">
-      <div class="countdown-bar-fill" style="width:${pct}%"></div>
+      <div class="countdown-bar-fill" style="width:100%"></div>
       ${ticks}
     </div>
   `;
@@ -1109,6 +1107,15 @@ function renderMain(){
       if(e.target.closest("button, a")) return; // у кнопок и ссылок своё поведение
       openDetailModal(item);
     });
+    // Если комментарий обрезался по 4 строкам — добавляем "подробнее", открывающее ту же карточку.
+    const noteEl = card.querySelector(".card-note-clamp");
+    if(noteEl && noteEl.scrollHeight > noteEl.clientHeight + 1){
+      const moreLink = document.createElement("span");
+      moreLink.className = "card-note-more";
+      moreLink.textContent = "подробнее";
+      moreLink.addEventListener("click", e => { e.stopPropagation(); openDetailModal(item); });
+      noteEl.insertAdjacentElement("afterend", moreLink);
+    }
     const cardImages = (item.images && item.images.length) ? item.images : (item.image ? [item.image] : []);
     if(cardImages.length > 1){
       const cardImgBox = card.querySelector(".card-img");
@@ -1198,7 +1205,7 @@ function renderCard(item){
           ? `<a href="${escapeHtml(item.link)}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a>`
           : escapeHtml(item.title)}</p>
         ${price ? `<div class="card-price">${escapeHtml(price)}</div>` : ""}
-        ${item.note ? `<p class="card-note">${escapeHtml(item.note)}</p>` : ""}
+        ${item.note ? `<p class="card-note card-note-clamp">${escapeHtml(item.note)}</p>` : ""}
         <div class="card-footer">
           ${renderCardFooter(item)}
         </div>
