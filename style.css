@@ -63,6 +63,8 @@ header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; g
 /* Переключатель темы сидит сразу справа от названия сайта, а не в дальнем углу шапки — на
    мобилке это экономит место в правой части, где живут контакты и остальные кнопки. */
 .topbar-title{display:flex; align-items:center; gap:12px;}
+/* Гостевая шапка: заголовок, тема, контакты и инфо-кнопка — всё в один ряд, раз помещается. */
+.topbar-row{display:flex; align-items:center; gap:12px; flex-wrap:wrap;}
 .countdown-hero{max-width:480px; margin:0 auto 24px; text-align:center;}
 .countdown-hero .countdown-label{font-size:1.05rem; font-weight:600; color:var(--text); margin-bottom:8px;}
 .countdown-hero .countdown-bar{height:14px; border-radius:7px;}
@@ -184,6 +186,13 @@ button:disabled{opacity:.55; cursor:not-allowed;}
 .card-title a:hover{color:var(--accent-solid); text-decoration:underline;}
 .card-price{color:var(--accent-solid); font-weight:600; font-size:.95rem;}
 .card-note{color:var(--muted); font-size:.88rem; white-space:pre-wrap; margin:0;}
+/* В сетке комментарий обрезаем по 4 строкам — полный текст доступен по клику на карточку.
+   В модалке с деталями .card-note используется без этого класса и не обрезается. */
+.card-note-clamp{display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden;}
+.card-note-more{
+  display:inline-block; margin-top:2px; color:var(--accent-solid); font-size:.85rem; font-weight:600; cursor:pointer;
+}
+.card-note-more:hover{text-decoration:underline;}
 .card-link a{color:var(--accent-solid); font-size:.88rem; text-decoration:none;}
 .card-link a:hover{text-decoration:underline;}
 .card-footer{margin-top:auto; padding-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
