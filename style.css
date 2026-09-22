@@ -215,7 +215,11 @@ button:disabled{opacity:.55; cursor:not-allowed;}
 .contact-link{font-size:.8rem; color:var(--muted); text-decoration:none; display:inline-flex; align-items:center; gap:4px;}
 .contact-link svg{width:14px; height:14px; flex:none;}
 .contact-link:hover{color:var(--accent-solid); text-decoration:underline;}
-.popup-contacts{display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;}
+/* Один общий подписи "Написать:" по центру, кнопки-контакты под ней в ряд — компактнее,
+   чем повторять "Написать:" в каждой кнопке. */
+.popup-contacts{margin-top:10px; text-align:center;}
+.popup-contacts-label{font-size:.85rem; color:var(--muted); font-weight:600; margin-bottom:8px;}
+.popup-contacts-btns{display:flex; gap:10px; flex-wrap:wrap; justify-content:center;}
 .popup-contacts .contact-btn{
   display:inline-flex; align-items:center; gap:8px; font-size:.88rem; font-weight:600;
   padding:10px 14px; border-radius:10px; background:var(--input-bg); border:1px solid var(--border);
@@ -270,6 +274,7 @@ button:disabled{opacity:.55; cursor:not-allowed;}
 .price-row input{flex:1;}
 .price-row select{width:110px; flex:none;}
 .modal-actions{display:flex; justify-content:flex-end; gap:8px; margin-top:18px; flex-wrap:wrap;}
+.modal-actions-center{justify-content:center;}
 .modal-actions .left{margin-right:auto;}
 .error-text{color:var(--danger); font-size:.85rem; margin-top:8px; min-height:1em;}
 .toast{
