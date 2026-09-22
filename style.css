@@ -95,6 +95,11 @@ header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; g
   font-size:1.5em; opacity:.35; pointer-events:none;
 }
 .calendar-cell-daynum{position:relative; z-index:1;}
+/* Прошедшие дни (включая сегодняшний — его факт уже открыт) выглядят слегка оторванными:
+   наклон + лёгкое затемнение. Кликабельны только те, для которых есть факт про Антона. */
+.calendar-cell-past{transform:rotate(-6deg); opacity:.72; transition:opacity .15s;}
+.calendar-cell-past[data-fact-date]{cursor:pointer;}
+.calendar-cell-past[data-fact-date]:hover{opacity:1;}
 
 /* тумблер темы: скруглённый прямоугольник + кружок, который едет по клику.
    Солнце и луна нарисованы векторно и лежат по краям трека — тумблер-кружок
