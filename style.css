@@ -1,6 +1,6 @@
 :root{
   --bg1:#fdf2f8; --bg2:#eef2ff;
-  --card:#d9d9d9; --text:#2d2a3a; --muted:#8b8794;
+  --card:#ededed; --text:#2d2a3a; --muted:#8b8794;
   --accent:#e8823f; --accent-solid:#e8823f; --accent-hover:#d16f2f;
   --border:#eee3ea; --ok:#3fa672; --danger:#d9455f;
   --shadow:0 4px 20px rgba(60,20,50,.08);
@@ -78,7 +78,7 @@ header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; g
 .calendar-row{display:flex; align-items:center; gap:6px; justify-content:center; flex-wrap:wrap;}
 .calendar-cell{
   width:38px; display:flex; flex-direction:column; border-radius:8px; overflow:hidden;
-  box-shadow:var(--shadow); background:var(--card); flex:none;
+  box-shadow:var(--shadow); background:var(--modal-bg); flex:none;
 }
 .calendar-cell-dow{
   background:var(--accent-solid); color:#fff; font-size:.6rem; font-weight:700; letter-spacing:.02em;
@@ -146,7 +146,7 @@ button:disabled{opacity:.55; cursor:not-allowed;}
 .empty-state h2{color:var(--text); margin-bottom:8px;}
 .filters-bar{
   display:flex; flex-wrap:wrap; gap:14px; align-items:center; margin-bottom:18px;
-  padding:12px 16px; background:var(--card); border-radius:12px; box-shadow:var(--shadow);
+  padding:12px 16px; background:var(--modal-bg); border-radius:12px; box-shadow:var(--shadow);
 }
 /* Выпадающий список категорий с галочками (details/summary — без лишнего JS для открытия/закрытия) */
 .dropdown-check{position:relative;}
