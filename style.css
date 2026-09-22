@@ -100,6 +100,9 @@ header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; g
 .calendar-cell-past{transform:rotate(-6deg); opacity:.72; transition:opacity .15s;}
 .calendar-cell-past[data-fact-date]{cursor:pointer;}
 .calendar-cell-past[data-fact-date]:hover{opacity:1;}
+/* Шапка попапа с фактом — тот же календарик-клетка слева, подпись справа от него. */
+.fact-popup-header{display:flex; align-items:center; gap:12px; margin-bottom:14px;}
+.fact-popup-title{font-weight:700; font-size:1.05rem; color:var(--text);}
 
 /* тумблер темы: скруглённый прямоугольник + кружок, который едет по клику.
    Солнце и луна нарисованы векторно и лежат по краям трека — тумблер-кружок
