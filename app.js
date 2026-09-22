@@ -1170,16 +1170,22 @@ function renderTopContacts(){
 // куда писать с вопросами. Показывается сам при первом визите (см. maybeShowIntro),
 // плюс доступен в любой момент по кнопке ℹ️ в шапке.
 function openIntroModal(){
+  // Лера слева, Антон справа в этом попапе — порядок только для этих двух кнопок,
+  // глобальный CONFIG.CONTACTS (шапка, карточки) не трогаем.
+  const popupContacts = [...CONFIG.CONTACTS].reverse();
   openModal(`
     <h3>🎁 Вишлист Антона</h3>
-    <p class="intro-text">Здесь — то, что его порадует. Выбирайте, что нравится!</p>
-    <p class="intro-text"><strong>Как забронировать.</strong> Нажмите «Хочу подарить», оставьте имя — его увидите только вы, Антон брони не видит, сюрприз останется сюрпризом.</p>
-    <p class="intro-text"><strong>Если передумали.</strong> Вернитесь к подарку, нажмите «Отменить» и введите то же имя.</p>
-    <p class="intro-text"><strong>Есть вопросы?</strong> Пишите Лере — подскажет по размеру, цвету и другим деталям. Антону тоже можно написать напрямую 😉</p>
+    <p class="intro-text">Здесь — то, что его порадует. Выбирайте на свой вкус!</p>
+    <p class="intro-text"><strong>Как забронировать</strong><br>Нажмите «Хочу подарить», оставьте имя — его увидите только вы. Антон брони не видит, сюрприз останется сюрпризом.</p>
+    <p class="intro-text"><strong>Если передумали</strong><br>Нажмите «Отменить» на выбранном подарке, введите своё имя.</p>
+    <p class="intro-text"><strong>Есть вопросы?</strong><br>Пишите Лере — подскажет по размеру, цвету и другим деталям. Антону тоже можно написать напрямую 😉</p>
     <div class="popup-contacts">
-      ${CONFIG.CONTACTS.map(c => `<a href="${escapeHtml(c.url)}" target="_blank" rel="noopener" class="contact-btn">${TELEGRAM_ICON_SVG} Написать: ${escapeHtml(c.name)}</a>`).join("")}
+      <div class="popup-contacts-label">Написать:</div>
+      <div class="popup-contacts-btns">
+        ${popupContacts.map(c => `<a href="${escapeHtml(c.url)}" target="_blank" rel="noopener" class="contact-btn">${TELEGRAM_ICON_SVG} ${escapeHtml(c.name)}</a>`).join("")}
+      </div>
     </div>
-    <div class="modal-actions">
+    <div class="modal-actions modal-actions-center">
       <button id="introCloseBtn">Понятно, спасибо!</button>
     </div>
   `, overlay => {
