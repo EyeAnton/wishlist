@@ -218,15 +218,20 @@ button:disabled{opacity:.55; cursor:not-allowed;}
   text-align:center; padding:80px 20px; color:var(--muted);
 }
 .empty-state h2{color:var(--text); margin-bottom:8px;}
+/* justify-content:space-evenly — а не flex-start + gap — потому что панель шире своего
+   содержимого (тянется на всю ширину карточек), и с обычным gap после последнего элемента
+   (инфо-кнопки) до правого края оставался большой пустой хвост, визуально не совпадающий с
+   промежутками между элементами. space-evenly делит всё свободное место поровну между каждой
+   парой элементов И перед первым/после последнего. Но это равенство только между "слотами"
+   space-evenly — если левый/правый padding контейнера не равен gap, боковые промежутки всё
+   равно будут отличаться от промежутков между элементами на (padding − gap). Поэтому
+   padding-left/right здесь всегда равны gap (и переопределяются вместе в медиа-запросе) —
+   тогда все промежутки, включая крайние, действительно совпадают. */
 .filters-bar{
-  display:flex; flex-wrap:wrap; gap:14px; align-items:center; margin-bottom:18px;
-  padding:12px 16px; background:var(--modal-bg); border-radius:12px; box-shadow:var(--shadow);
+  display:flex; flex-wrap:wrap; justify-content:space-evenly; gap:14px; align-items:center;
+  margin-bottom:18px; padding:12px 14px; background:var(--modal-bg); border-radius:12px;
+  box-shadow:var(--shadow);
 }
-/* Чекбокс Ozon без своего padding — его край и есть его содержимое, поэтому обычный gap перед
-   ним визуально равен промежутку между другими элементами. У инфо-кнопки есть свой padding-left
-   (12px), который к тому же gap прибавляется визуально — компенсируем отрицательным margin, чтобы
-   расстояние "Ozon → иконка (i)" на глаз совпадало с "Категории → Ozon". */
-#infoBtn{margin-left:-12px;}
 /* Выпадающий список категорий с галочками (details/summary — без лишнего JS для открытия/закрытия) */
 .dropdown-check{position:relative;}
 .dropdown-check-toggle{
@@ -397,9 +402,9 @@ button:disabled{opacity:.55; cursor:not-allowed;}
   #currencyDropdown{display:none;}
   .marketplace-label-full{display:none;}
   .marketplace-label-short{display:inline;}
-  .filters-bar{padding:9px 10px; gap:6px;}
+  .filters-bar{padding:9px 6px; gap:6px;}
   .dropdown-check-toggle{padding:6px 8px; font-size:.82rem; gap:6px;}
   .dropdown-check-arrow{width:9px; height:9px;}
   .marketplace-filter{font-size:.82rem; gap:5px;}
-  #infoBtn{padding:6px 8px; margin-left:-8px;}
+  #infoBtn{padding:6px 8px;}
 }
