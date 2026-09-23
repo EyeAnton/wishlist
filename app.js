@@ -145,7 +145,8 @@ function initTheme(){
           { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
           { duration: 550, easing: "ease-in-out", pseudoElement: "::view-transition-new(root)" }
         );
-      });
+      }).catch(() => { /* браузер мог прервать переход (например, вкладка стала невидимой) —
+        applyTheme(next) в апдейт-коллбэке уже отработал, анимация просто не понадобится */ });
     });
   }
 }
