@@ -74,6 +74,14 @@ header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; g
 /* width:100% обязателен: без него topbar-row как flex-item внутри header.topbar сжимается
    по контенту и margin-left:auto ниже не имеет свободного места, чтобы прижать тему к краю. */
 .topbar-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap; width:100%;}
+/* На десктопе (только там — на мобилке разница шрифтов меньше и center выглядит нормально)
+   "Вишлист" (крупный) и "Антон"/"Лера" (мелкий) центрировались по высоте своих боксов, а не по
+   тексту — при таком разбросе размеров шрифта геометрический центр бокса и оптический центр
+   текста расходятся, и строка выглядит "не на одной линии". baseline выравнивает сам текст. */
+@media (min-width:481px){
+  .topbar-row{align-items:baseline;}
+  .theme-switch-end{align-self:center;}
+}
 /* Тема прижата к правому краю через margin-left:auto — отдельно от контактов, не вплотную
    к именам, а с отступом, забирающим всё свободное место в ряду. */
 .theme-switch-end{margin-left:auto;}
@@ -231,6 +239,16 @@ button:disabled{opacity:.55; cursor:not-allowed;}
   display:flex; flex-wrap:wrap; justify-content:space-evenly; gap:14px; align-items:center;
   margin-bottom:18px; padding:12px 14px; background:var(--modal-bg); border-radius:12px;
   box-shadow:var(--shadow);
+}
+/* На десктопе фильтры не тянутся во всю ширину карточек — просто пакуются слева с обычным
+   промежутком, без space-evenly (тот остаётся только для мобилки, где ширины впритык). */
+@media (min-width:481px){
+  .filters-bar{justify-content:flex-start;}
+}
+/* Кнопка-инфо — круг: фиксированные равные ширина/высота вместо padding вокруг иконки. */
+#infoBtn{
+  width:38px; height:38px; padding:0; display:inline-flex; align-items:center; justify-content:center;
+  border-radius:50%; flex:none;
 }
 /* Выпадающий список категорий с галочками (details/summary — без лишнего JS для открытия/закрытия) */
 .dropdown-check{position:relative;}
@@ -397,14 +415,13 @@ button:disabled{opacity:.55; cursor:not-allowed;}
   .full-btn{font-size:.8rem; padding:8px 6px;}
   .reserved-badge{font-size:.72rem; padding:5px 7px;}
   .owner-actions button{padding:5px 7px; font-size:.78rem;}
-  /* Валюту на мобилке прячем целиком (места мало, а конвертация не главное), сокращаем текст
-     галочки Ozon/WB и ужимаем остальные фильтры — чтобы вся панель влезла в одну строку. */
-  #currencyDropdown{display:none;}
+  /* Сокращаем текст галочки Ozon/WB и ужимаем остальные фильтры — чтобы вся панель влезла
+     в одну строку. */
   .marketplace-label-full{display:none;}
   .marketplace-label-short{display:inline;}
   .filters-bar{padding:9px 6px; gap:6px;}
   .dropdown-check-toggle{padding:6px 8px; font-size:.82rem; gap:6px;}
   .dropdown-check-arrow{width:9px; height:9px;}
   .marketplace-filter{font-size:.82rem; gap:5px;}
-  #infoBtn{padding:6px 8px;}
+  #infoBtn{width:32px; height:32px;}
 }
