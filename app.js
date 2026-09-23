@@ -778,6 +778,13 @@ function openItemModal(existingItem){
       </select>
     </div>
     <div class="field">
+      <label class="filter-chip" style="font-weight:600;">
+        <input type="checkbox" id="fAllowMultiple" ${item.allowMultiple ? "checked" : ""}>
+        Можно подарить несколько штук (сертификаты, деньги и т.п.)
+      </label>
+      <small>Вместо "уже дарят" гости увидят счётчик "N человек выбрали это" и смогут присоединиться.</small>
+    </div>
+    <div class="field">
       <label>Цена</label>
       <div class="price-row">
         <input type="number" step="0.01" id="fPriceAmount" value="${escapeHtml(initialAmount)}" placeholder="0">
@@ -900,7 +907,7 @@ function openItemModal(existingItem){
       if(unreserveBtn){
         unreserveBtn.addEventListener("click", async () => {
           await withLoadingButton(unreserveBtn, async () => {
-            await update(itemRef(item.id), { reservedBy: "" });
+            await update(itemRef(item.id), { reservedBy: "", reservedByMulti: null });
             closeModal();
             showToast("Готово");
           });
@@ -927,6 +934,7 @@ function openItemModal(existingItem){
         priceAmount: amountRaw ? Number(amountRaw) : null,
         priceCurrency: amountRaw ? overlay.querySelector("#fPriceCurrency").value : null,
         price: null, // на случай редактирования старой записи со старым текстовым полем цены
+        allowMultiple: overlay.querySelector("#fAllowMultiple").checked || null,
       };
       const saveBtn = overlay.querySelector("#saveItem");
       await withLoadingButton(saveBtn, async () => {
@@ -1043,9 +1051,16 @@ function openReserveModal(item){
       const btn = overlay.querySelector("#confirmReserve");
       await withLoadingButton(btn, async () => {
         try{
-          const current = state.items.find(i => i.id === item.id);
-          if(current && current.reservedBy) throw new Error("Этот подарок уже хотят подарить");
-          await update(itemRef(item.id), { reservedBy: name });
+          if(item.allowMultiple){
+            // Можно дарить несколько штук — просто добавляем свою запись в список, никого не
+            // блокируя. Ключ случайный (не само имя), чтобы в имени можно было использовать
+            // любые символы без риска сломать путь в Firebase.
+            await update(itemRef(item.id), { [`reservedByMulti/${uid()}`]: name });
+          }else{
+            const current = state.items.find(i => i.id === item.id);
+            if(current && current.reservedBy) throw new Error("Этот подарок уже хотят подарить");
+            await update(itemRef(item.id), { reservedBy: name });
+          }
           closeModal();
           showThanksPopup();
         }catch(e){
@@ -1077,15 +1092,27 @@ function openCancelReserveModal(item){
     overlay.querySelector("#cancelCancelReserve").addEventListener("click", closeModal);
     overlay.querySelector("#confirmCancelReserve").addEventListener("click", async () => {
       const name = input.value.trim();
-      if(!name || name.toLowerCase() !== (item.reservedBy||"").toLowerCase()){
-        overlay.querySelector("#cancelError").textContent = "Имя не совпадает";
+      if(!name){
+        overlay.querySelector("#cancelError").textContent = "Введите имя";
         return;
       }
       const btn = overlay.querySelector("#confirmCancelReserve");
       await withLoadingButton(btn, async () => {
-        await update(itemRef(item.id), { reservedBy: "" });
-        closeModal();
-        showToast("Отменено");
+        try{
+          if(item.allowMultiple){
+            const entries = Object.entries(item.reservedByMulti || {});
+            const match = entries.find(([, n]) => n.toLowerCase() === name.toLowerCase());
+            if(!match) throw new Error("Имя не совпадает");
+            await update(itemRef(item.id), { [`reservedByMulti/${match[0]}`]: null });
+          }else{
+            if(name.toLowerCase() !== (item.reservedBy||"").toLowerCase()) throw new Error("Имя не совпадает");
+            await update(itemRef(item.id), { reservedBy: "" });
+          }
+          closeModal();
+          showToast("Отменено");
+        }catch(e){
+          overlay.querySelector("#cancelError").textContent = e.message;
+        }
       });
     });
   });
@@ -1477,24 +1504,55 @@ function renderCard(item){
   `;
 }
 
+function peopleWord(n){
+  const mod10 = n % 10, mod100 = n % 100;
+  if(mod100 >= 11 && mod100 <= 14) return "человек";
+  if(mod10 === 1) return "человек";
+  if(mod10 >= 2 && mod10 <= 4) return "человека";
+  return "человек";
+}
+
+// Компактная кнопка отмены — серый крестик, на десктопе разворачивается в "Отменить" при
+// наведении (на тач-устройствах наведения нет, крестик так и остаётся компактным, но кликабелен).
+const CANCEL_X_BTN = `<button class="cancel-x-btn cancelReserveBtn" title="Отменить" aria-label="Отменить"><span class="cancel-x-icon">✕</span><span class="cancel-x-label">Отменить</span></button>`;
+
 function renderCardFooter(item){
   // Владелец (получатель подарков) сюрприз не видит вообще — ни факта брони, ни имени,
   // иначе сюрприза не остаётся. Хелпер (жена) видит имя, чтобы координировать подарки,
   // но список не редактирует.
   if(state.isOwner) return "";
   if(state.canSeeNames){
+    if(item.allowMultiple){
+      const names = item.reservedByMulti ? Object.values(item.reservedByMulti) : [];
+      if(!names.length) return `<span style="color:var(--muted);font-size:.85rem;">Свободно</span>`;
+      return `<span class="reserved-badge">🎁 Дарят: ${names.map(escapeHtml).join(", ")}</span>`;
+    }
     if(!item.reservedBy) return `<span style="color:var(--muted);font-size:.85rem;">Свободно</span>`;
     return `<span class="reserved-badge">🎁 Хотят подарить: ${escapeHtml(item.reservedBy)}</span>`;
   }
   // На админ-странице до входа владельца/хелпера бронировать нечем — это переходное состояние,
   // а не гостевой просмотр, так что кнопки "Хочу подарить" тут вообще быть не должно.
   if(IS_ADMIN) return "";
+  if(item.allowMultiple){
+    // Можно дарить несколько штук — вместо блокировки показываем счётчик и не прячем кнопку
+    // "Хочу подарить" (можно присоединиться), а рядом — компактная отмена для тех, кто уже
+    // записался (какое именно имя — проверяется в самом попапе отмены, как и раньше).
+    // Бейдж и крестик отмены — первыми, кнопка "Хочу подарить" (full-btn, во всю ширину) —
+    // последней: так она сама переносится на отдельную строку под ними, а не ломает раскладку,
+    // пытаясь встать в 100% ширины ПЕРЕД остальными элементами строки.
+    const count = item.reservedByMulti ? Object.keys(item.reservedByMulti).length : 0;
+    return `
+      ${count > 0 ? `<span class="reserved-badge">🎁 ${count} ${peopleWord(count)} выбрали это</span>` : ""}
+      ${count > 0 ? CANCEL_X_BTN : ""}
+      <button class="full-btn reserveBtn">Хочу подарить</button>
+    `;
+  }
   if(item.reservedBy){
     // Имя не показываем гостям — его же нужно ввести, чтобы отменить. Покажи мы его тут,
     // любой гость мог бы подсмотреть и отменить чужую отметку.
     return `
       <span class="reserved-badge">🎁 Уже дарят</span>
-      <button class="ghost cancelReserveBtn" style="font-size:.78rem;">Отменить</button>
+      ${CANCEL_X_BTN}
     `;
   }
   return `<button class="full-btn reserveBtn">Хочу подарить</button>`;

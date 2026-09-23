@@ -335,6 +335,23 @@ button:disabled{opacity:.55; cursor:not-allowed;}
   background:var(--reserved-bg); color:var(--reserved-text); font-size:.8rem; padding:6px 10px; border-radius:8px; font-weight:600;
   display:flex; align-items:center; gap:6px; flex:1;
 }
+/* Компактная кнопка отмены брони — серый крестик, на hover (десктоп) разворачивается в полную
+   кнопку "Отменить". Ширина всей кнопки — auto по контенту (иконка + схлопнутый label), поэтому
+   на тач-устройствах (нет hover) она остаётся маленьким кружком, но так же кликабельна. */
+.cancel-x-btn{
+  display:inline-flex; align-items:center; gap:0; overflow:hidden; flex:none;
+  height:28px; padding:0 7px; border-radius:14px; font:inherit; white-space:nowrap;
+  background:transparent; border:1px solid var(--border); color:var(--muted);
+  transition:background .15s, color .15s, border-color .15s, padding .2s ease, gap .2s ease;
+}
+.cancel-x-icon{font-size:.75rem; line-height:1; flex:none;}
+.cancel-x-label{
+  max-width:0; opacity:0; overflow:hidden; white-space:nowrap;
+  transition:max-width .25s ease, opacity .15s ease;
+  font-size:.78rem; font-weight:600;
+}
+.cancel-x-btn:hover{background:var(--danger); border-color:var(--danger); color:#fff; padding:0 12px 0 10px; gap:6px;}
+.cancel-x-btn:hover .cancel-x-label{max-width:100px; opacity:1; transition:max-width .25s ease, opacity .2s ease .08s;}
 .owner-actions{position:absolute; top:8px; right:8px; display:flex; gap:6px; z-index:3;}
 .owner-actions button{padding:6px 9px; font-size:.85rem; border-radius:8px;}
 /* Отложенные товары видит только владелец — полупрозрачными, пока не нажмёт "вернуть в список". */
