@@ -163,6 +163,30 @@ function initTheme(){
   }
 }
 
+// ====== НЕБО (звёзды на тёмном фоне) ======
+// Фон день/ночь сам по себе — на CSS-переменных --bg1/--bg2 и --night-opacity (реагируют на
+// [data-theme] так же, как остальная тема). Тут только генерируем звёзды со случайным
+// положением и длительностью/задержкой мерцания — чтобы они мигали вразнобой, а не все разом.
+function initSky(){
+  const container = $("#skyStars");
+  if(!container || container.dataset.ready) return;
+  container.dataset.ready = "1";
+  const STAR_COUNT = 60;
+  const frag = document.createDocumentFragment();
+  for(let i = 0; i < STAR_COUNT; i++){
+    const star = document.createElement("span");
+    star.className = "sky-star";
+    const size = (Math.random() * 1.6 + 1).toFixed(1);
+    star.style.left = `${(Math.random() * 100).toFixed(2)}%`;
+    star.style.top = `${(Math.random() * 70).toFixed(2)}%`;
+    star.style.width = star.style.height = `${size}px`;
+    star.style.animationDuration = `${(Math.random() * 2.5 + 2).toFixed(2)}s`;
+    star.style.animationDelay = `${(Math.random() * -4).toFixed(2)}s`;
+    frag.appendChild(star);
+  }
+  container.appendChild(frag);
+}
+
 // ====== СЧЁТЧИК ДО 1 ОКТЯБРЯ ======
 function daysWord(n){
   const mod10 = n % 10, mod100 = n % 100;
@@ -1608,6 +1632,7 @@ function watchFacts(){
 export function initApp(opts){
   IS_ADMIN = !!(opts && opts.isAdmin);
   initTheme();
+  initSky();
   initCountdown();
   initFirebase();
   renderAll();
