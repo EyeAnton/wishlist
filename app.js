@@ -141,18 +141,21 @@ function initTheme(){
       const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
       // Кнопка сидит в углу шапки — до верхнего/правого края всего 20-50px, так что при чистом
       // росте круга он почти сразу упирается в край, и кажется, что расходится "сверху", а не от
-      // кнопки. Добавляем быстрый "хлопок" видимого кружка размером с саму кнопку — он ещё
-      // умещается внутри доступного места, — и только после него начинается основной разлёт.
+      // кнопки. Предыдущая попытка (быстрый "хлопок" на 15% от 650мс, ~100мс) была слишком
+      // короткой, чтобы глаз успел её заметить как отдельную фазу. Теперь кружок размером с саму
+      // кнопку явно ДЕРЖИТСЯ на месте четверть секунды, прежде чем начать разлетаться — эту паузу
+      // уже невозможно не заметить.
       const popRadius = Math.max(rect.width, rect.height) / 2 + 4;
       const transition = document.startViewTransition(() => applyTheme(next));
       transition.ready.then(() => {
         document.documentElement.animate(
           [
-            { clipPath: `circle(0px at ${x}px ${y}px)`, offset: 0, easing: "ease-out" },
-            { clipPath: `circle(${popRadius}px at ${x}px ${y}px)`, offset: 0.15, easing: "ease-in" },
+            { clipPath: `circle(0px at ${x}px ${y}px)`, offset: 0 },
+            { clipPath: `circle(${popRadius}px at ${x}px ${y}px)`, offset: 0.2 },
+            { clipPath: `circle(${popRadius}px at ${x}px ${y}px)`, offset: 0.45 },
             { clipPath: `circle(${radius}px at ${x}px ${y}px)`, offset: 1 },
           ],
-          { duration: 650, pseudoElement: "::view-transition-new(root)" }
+          { duration: 900, easing: "ease-in-out", pseudoElement: "::view-transition-new(root)" }
         );
       }).catch(() => { /* браузер мог прервать переход (например, вкладка стала невидимой) —
         applyTheme(next) в апдейт-коллбэке уже отработал, анимация просто не понадобится */ });
