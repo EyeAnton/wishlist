@@ -1241,19 +1241,13 @@ function renderMain(){
   // так что порядок среди остальных не трогаем.
   visibleItems = visibleItems.slice().sort((a, b) => (a.pinned ? 0 : 1) - (b.pinned ? 0 : 1));
 
-  // Заголовки дропдаунов фиксированные ("Сортировка"/"Категории"/"Валюта") и не отражают текущий
+  // Заголовки дропдаунов фиксированные ("Сортировка"/"Категории") и не отражают текущий
   // выбор — раньше там был текущий вариант, и это смотрелось странно (особенно с длинными названиями).
   const dropdownArrow = `<svg class="dropdown-check-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="5 8 10 13 15 8"/></svg>`;
   const sortOptions = [
     ["default", "Порядок: по умолчанию"],
     ["price_asc", "Цена: сначала дешёвые"],
     ["price_desc", "Цена: сначала дорогие"],
-  ];
-  const currencyOptions = [
-    ["original", "Как указано"],
-    ["USD", "USD $"],
-    ["RUB", "RUB ₽"],
-    ["AMD", "AMD"],
   ];
 
   const filtersBar = `
@@ -1282,20 +1276,6 @@ function renderMain(){
             <label class="filter-chip">
               <input type="checkbox" class="categoryFilterCheckbox" value="${escapeHtml(cat)}" ${state.selectedCategories.has(cat) ? "checked" : ""}>
               ${escapeHtml(cat)}
-            </label>
-          `).join("")}
-        </div>
-      </details>
-      <details class="dropdown-check" id="currencyDropdown"${openDropdownId === "currencyDropdown" ? " open" : ""}>
-        <summary class="dropdown-check-toggle">
-          <span>Валюта</span>
-          ${dropdownArrow}
-        </summary>
-        <div class="dropdown-check-panel">
-          ${currencyOptions.map(([value, label]) => `
-            <label class="filter-chip">
-              <input type="radio" name="currencyRadio" class="currencyRadio" value="${value}" ${state.viewCurrency === value ? "checked" : ""}>
-              ${escapeHtml(label)}
             </label>
           `).join("")}
         </div>
@@ -1332,14 +1312,6 @@ function renderMain(){
     radio.addEventListener("change", () => {
       state.sortBy = radio.value;
       openDropdownId = null; // выбор одного варианта — дропдаун закрывается сам
-      renderMain();
-    });
-  });
-  el.querySelectorAll(".currencyRadio").forEach(radio => {
-    radio.addEventListener("change", () => {
-      state.viewCurrency = radio.value;
-      localStorage.setItem(LS.viewCurrency, state.viewCurrency);
-      openDropdownId = null;
       renderMain();
     });
   });
