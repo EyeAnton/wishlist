@@ -126,7 +126,26 @@ function initTheme(){
         || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
       const next = current === "dark" ? "light" : "dark";
       localStorage.setItem(LS.theme, next);
-      applyTheme(next);
+
+      // Круг расходится от кнопки и заполняет весь фон — через View Transitions API, если браузер
+      // её поддерживает (и пользователь не просил уменьшить анимации); иначе тема просто мгновенно
+      // переключается без эффекта, как раньше.
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if(!document.startViewTransition || reduceMotion){
+        applyTheme(next);
+        return;
+      }
+      const rect = btn.getBoundingClientRect();
+      const x = rect.left + rect.width / 2;
+      const y = rect.top + rect.height / 2;
+      const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+      const transition = document.startViewTransition(() => applyTheme(next));
+      transition.ready.then(() => {
+        document.documentElement.animate(
+          { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
+          { duration: 550, easing: "ease-in-out", pseudoElement: "::view-transition-new(root)" }
+        );
+      });
     });
   }
 }
@@ -336,8 +355,27 @@ function openFactEditModal(key){
   }, { closeOnBackdrop: true });
 }
 
-// При первом заходе в новый день сам показываем факт, который только что "открылся" —
-// как с попапом-подсказкой, но per-day, а не одноразово.
+// Клетка нового факта слегка покачивается и показывает короткую подсказку над собой — вместо
+// того чтобы сразу открывать попап (это уже интрузивно на каждый день), просто привлекаем
+// внимание, а сам факт гость открывает кликом, как и все остальные прошедшие дни.
+function highlightNewFactCell(key){
+  const cell = document.querySelector(`.calendar-cell[data-fact-date="${key}"]`);
+  if(!cell) return;
+  cell.classList.add("calendar-cell-new-fact");
+  cell.addEventListener("animationend", () => cell.classList.remove("calendar-cell-new-fact"), { once: true });
+
+  const rect = cell.getBoundingClientRect();
+  const tip = document.createElement("div");
+  tip.className = "calendar-cell-tooltip";
+  tip.textContent = "Новый факт обо мне";
+  tip.style.left = Math.round(rect.left + rect.width / 2) + "px";
+  tip.style.top = Math.round(rect.top) + "px";
+  document.body.appendChild(tip);
+  setTimeout(() => tip.remove(), 3200);
+}
+
+// При первом заходе в новый день привлекаем внимание к клетке факта, который только что
+// "открылся" — per-day, а не одноразово (см. highlightNewFactCell).
 function maybeShowDailyFact(){
   if(IS_ADMIN) return;
   const now = new Date();
@@ -348,7 +386,7 @@ function maybeShowDailyFact(){
   const key = dateKey(latestOpened);
   if(!DAILY_FACTS[key]) return;
   if(localStorage.getItem(LS.dailyFactSeen) === key) return;
-  openFactModal(key);
+  highlightNewFactCell(key);
   localStorage.setItem(LS.dailyFactSeen, key);
 }
 
