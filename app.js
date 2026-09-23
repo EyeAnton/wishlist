@@ -139,11 +139,20 @@ function initTheme(){
       const x = rect.left + rect.width / 2;
       const y = rect.top + rect.height / 2;
       const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+      // Кнопка сидит в углу шапки — до верхнего/правого края всего 20-50px, так что при чистом
+      // росте круга он почти сразу упирается в край, и кажется, что расходится "сверху", а не от
+      // кнопки. Добавляем быстрый "хлопок" видимого кружка размером с саму кнопку — он ещё
+      // умещается внутри доступного места, — и только после него начинается основной разлёт.
+      const popRadius = Math.max(rect.width, rect.height) / 2 + 4;
       const transition = document.startViewTransition(() => applyTheme(next));
       transition.ready.then(() => {
         document.documentElement.animate(
-          { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
-          { duration: 550, easing: "ease-in-out", pseudoElement: "::view-transition-new(root)" }
+          [
+            { clipPath: `circle(0px at ${x}px ${y}px)`, offset: 0, easing: "ease-out" },
+            { clipPath: `circle(${popRadius}px at ${x}px ${y}px)`, offset: 0.15, easing: "ease-in" },
+            { clipPath: `circle(${radius}px at ${x}px ${y}px)`, offset: 1 },
+          ],
+          { duration: 650, pseudoElement: "::view-transition-new(root)" }
         );
       }).catch(() => { /* браузер мог прервать переход (например, вкладка стала невидимой) —
         applyTheme(next) в апдейт-коллбэке уже отработал, анимация просто не понадобится */ });
