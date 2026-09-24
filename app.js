@@ -126,39 +126,67 @@ function initTheme(){
         || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
       const next = current === "dark" ? "light" : "dark";
       localStorage.setItem(LS.theme, next);
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
       // Круг расходится от кнопки и заполняет весь фон — через View Transitions API, если браузер
       // её поддерживает (и пользователь не просил уменьшить анимации); иначе тема просто мгновенно
       // переключается без эффекта, как раньше.
-      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      if(!document.startViewTransition || reduceMotion){
-        applyTheme(next);
+      const runColorTransition = () => {
+        if(!document.startViewTransition || reduceMotion){
+          applyTheme(next);
+          return;
+        }
+        const rect = btn.getBoundingClientRect();
+        const x = rect.left + rect.width / 2;
+        const y = rect.top + rect.height / 2;
+        const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+        // Кнопка сидит в углу шапки — до верхнего/правого края всего 20-50px, так что при чистом
+        // росте круга он почти сразу упирается в край, и кажется, что расходится "сверху", а не от
+        // кнопки. Предыдущая попытка (быстрый "хлопок" на 15% от 650мс, ~100мс) была слишком
+        // короткой, чтобы глаз успел её заметить как отдельную фазу. Теперь кружок размером с саму
+        // кнопку явно ДЕРЖИТСЯ на месте четверть секунды, прежде чем начать разлетаться — эту паузу
+        // уже невозможно не заметить.
+        const popRadius = Math.max(rect.width, rect.height) / 2 + 4;
+        const transition = document.startViewTransition(() => applyTheme(next));
+        transition.ready.then(() => {
+          document.documentElement.animate(
+            [
+              { clipPath: `circle(0px at ${x}px ${y}px)`, offset: 0 },
+              { clipPath: `circle(${popRadius}px at ${x}px ${y}px)`, offset: 0.2 },
+              { clipPath: `circle(${popRadius}px at ${x}px ${y}px)`, offset: 0.45 },
+              { clipPath: `circle(${radius}px at ${x}px ${y}px)`, offset: 1 },
+            ],
+            { duration: 900, easing: "ease-in-out", pseudoElement: "::view-transition-new(root)" }
+          );
+        }).catch(() => { /* браузер мог прервать переход (например, вкладка стала невидимой) —
+          applyTheme(next) в апдейт-коллбэке уже отработал, анимация просто не понадобится */ });
+      };
+
+      // Уходящее светило (то, что было активно) проезжает по дуге вправо за кадр, а заступающее —
+      // одновременно заезжает по той же дуге слева (см. @keyframes sky-arc-exit/-enter в CSS).
+      // Это ОБЫЧНАЯ CSS-анимация на живом DOM, а не View Transitions — та на время своего перехода
+      // прячет живую страницу под статичный снимок, так что анимация на ней стала бы не видна.
+      // Поэтому дуга сначала доигрывает целиком, и только потом стартует переход цвета (круг от
+      // кнопки) — если запустить оба сразу, дугу никто не увидит.
+      const sunEl = $(".sky-sun"), moonEl = $(".sky-moon");
+      if(reduceMotion || !sunEl || !moonEl){
+        runColorTransition();
         return;
       }
-      const rect = btn.getBoundingClientRect();
-      const x = rect.left + rect.width / 2;
-      const y = rect.top + rect.height / 2;
-      const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
-      // Кнопка сидит в углу шапки — до верхнего/правого края всего 20-50px, так что при чистом
-      // росте круга он почти сразу упирается в край, и кажется, что расходится "сверху", а не от
-      // кнопки. Предыдущая попытка (быстрый "хлопок" на 15% от 650мс, ~100мс) была слишком
-      // короткой, чтобы глаз успел её заметить как отдельную фазу. Теперь кружок размером с саму
-      // кнопку явно ДЕРЖИТСЯ на месте четверть секунды, прежде чем начать разлетаться — эту паузу
-      // уже невозможно не заметить.
-      const popRadius = Math.max(rect.width, rect.height) / 2 + 4;
-      const transition = document.startViewTransition(() => applyTheme(next));
-      transition.ready.then(() => {
-        document.documentElement.animate(
-          [
-            { clipPath: `circle(0px at ${x}px ${y}px)`, offset: 0 },
-            { clipPath: `circle(${popRadius}px at ${x}px ${y}px)`, offset: 0.2 },
-            { clipPath: `circle(${popRadius}px at ${x}px ${y}px)`, offset: 0.45 },
-            { clipPath: `circle(${radius}px at ${x}px ${y}px)`, offset: 1 },
-          ],
-          { duration: 900, easing: "ease-in-out", pseudoElement: "::view-transition-new(root)" }
-        );
-      }).catch(() => { /* браузер мог прервать переход (например, вкладка стала невидимой) —
-        applyTheme(next) в апдейт-коллбэке уже отработал, анимация просто не понадобится */ });
+      const enteringEl = next === "dark" ? moonEl : sunEl;
+      const exitingEl = next === "dark" ? sunEl : moonEl;
+      exitingEl.classList.add("sky-arc-exit");
+      enteringEl.classList.add("sky-arc-enter");
+      let done = false;
+      const finishArc = () => {
+        if(done) return;
+        done = true;
+        exitingEl.classList.remove("sky-arc-exit");
+        enteringEl.classList.remove("sky-arc-enter");
+        runColorTransition();
+      };
+      exitingEl.addEventListener("animationend", finishArc, { once: true });
+      setTimeout(finishArc, 750); // страховка, если animationend по какой-то причине не придёт
     });
   }
 }
