@@ -1,4 +1,13 @@
+/* @property делает --bg1/--bg2 "типизированными" (а не произвольным текстовым токеном) — только
+   так браузер умеет плавно интерполировать ЦВЕТ между старым и новым значением через transition,
+   а не мгновенно подменять его. Именно это даёт градиенту неба живую, видимую смену цвета —
+   см. .sky-layer ниже и initTheme() в app.js, где JS на время дуги солнца/луны временно
+   выставляет inline --bg1/--bg2 целевой темы, чтобы небо перекрашивалось прямо во время анимации,
+   а не только после неё (когда стартует уже существующий переход через View Transitions API). */
+@property --bg1{syntax:'<color>'; inherits:true; initial-value:#fdf2f8;}
+@property --bg2{syntax:'<color>'; inherits:true; initial-value:#eef2ff;}
 :root{
+  transition:--bg1 .65s ease, --bg2 .65s ease;
   --bg1:#fdf2f8; --bg2:#eef2ff;
   --card:#ededed; --text:#2d2a3a; --muted:#8b8794;
   --accent:#e8823f; --accent-solid:#e8823f; --accent-hover:#d16f2f;
