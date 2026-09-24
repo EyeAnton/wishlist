@@ -10,8 +10,15 @@
 <body>
 <div class="sky-layer" id="skyLayer" aria-hidden="true">
   <div class="sky-stars" id="skyStars"></div>
-  <div class="sky-sun"></div>
-  <div class="sky-moon"><div class="sky-moon-shadow"></div></div>
+  <div id="skyShooting"></div>
+  <div class="sky-orbit">
+    <div class="sky-body-wrap" style="--dx:64vw; --dy:-195vh;">
+      <div class="sky-body-spin"><div class="sky-sun"></div></div>
+    </div>
+    <div class="sky-body-wrap" style="--dx:-64vw; --dy:195vh;">
+      <div class="sky-body-spin"><div class="sky-moon"><div class="sky-moon-shadow"></div></div></div>
+    </div>
+  </div>
 </div>
 <div id="app">
   <header class="topbar">

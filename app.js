@@ -116,109 +116,46 @@ function applyTheme(theme){
   }
 }
 
-// Целевые --bg1/--bg2 нужной темы, не имея их захардкоженными в JS (чтобы не разъезжались
-// с CSS): на мгновение выставляем [data-theme] в целевое значение, читаем computed style,
-// тут же возвращаем атрибут как было — всё синхронно, без единого кадра отрисовки между этим,
-// так что никакого мигания на странице не возникает.
-function readThemeGradient(theme){
-  const root = document.documentElement;
-  const prev = root.getAttribute("data-theme");
-  root.setAttribute("data-theme", theme);
-  const cs = getComputedStyle(root);
-  const bg1 = cs.getPropertyValue("--bg1").trim();
-  const bg2 = cs.getPropertyValue("--bg2").trim();
-  if(prev === null) root.removeAttribute("data-theme"); else root.setAttribute("data-theme", prev);
-  return { bg1, bg2 };
-}
+// Вращение солнца/луны вокруг общего пивота (см. .sky-orbit в CSS) — spin только растёт, чтобы
+// вращение всегда было по часовой стрелке, без исключений на повторных переключениях.
+let skySpin = 0;
 
 function initTheme(){
   const saved = localStorage.getItem(LS.theme);
   applyTheme(saved);
-  const btn = $("#themeToggle");
-  if(btn){
-    btn.addEventListener("click", () => {
-      const root = document.documentElement;
-      const current = root.getAttribute("data-theme")
-        || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-      const next = current === "dark" ? "light" : "dark";
-      localStorage.setItem(LS.theme, next);
-      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-      // Круг расходится от кнопки и заполняет весь фон — через View Transitions API, если браузер
-      // её поддерживает (и пользователь не просил уменьшить анимации); иначе тема просто мгновенно
-      // переключается без эффекта, как раньше.
-      const runColorTransition = () => {
-        if(!document.startViewTransition || reduceMotion){
-          applyTheme(next);
-          root.style.removeProperty("--bg1");
-          root.style.removeProperty("--bg2");
-          return;
-        }
-        const rect = btn.getBoundingClientRect();
-        const x = rect.left + rect.width / 2;
-        const y = rect.top + rect.height / 2;
-        const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
-        // Кнопка сидит в углу шапки — до верхнего/правого края всего 20-50px, так что при чистом
-        // росте круга он почти сразу упирается в край, и кажется, что расходится "сверху", а не от
-        // кнопки. Предыдущая попытка (быстрый "хлопок" на 15% от 650мс, ~100мс) была слишком
-        // короткой, чтобы глаз успел её заметить как отдельную фазу. Теперь кружок размером с саму
-        // кнопку явно ДЕРЖИТСЯ на месте четверть секунды, прежде чем начать разлетаться — эту паузу
-        // уже невозможно не заметить.
-        const popRadius = Math.max(rect.width, rect.height) / 2 + 4;
-        const transition = document.startViewTransition(() => {
-          applyTheme(next);
-          // Небо уже перекрашено (см. --bg1/--bg2 ниже, выставлены ДО этого момента и уже
-          // доиграли свой переход) — снимаем inline-override, чтобы дальше цвет снова диктовало
-          // обычное правило :root[data-theme]. Значения совпадают, так что смены не видно.
-          root.style.removeProperty("--bg1");
-          root.style.removeProperty("--bg2");
-        });
-        transition.ready.then(() => {
-          document.documentElement.animate(
-            [
-              { clipPath: `circle(0px at ${x}px ${y}px)`, offset: 0 },
-              { clipPath: `circle(${popRadius}px at ${x}px ${y}px)`, offset: 0.2 },
-              { clipPath: `circle(${popRadius}px at ${x}px ${y}px)`, offset: 0.45 },
-              { clipPath: `circle(${radius}px at ${x}px ${y}px)`, offset: 1 },
-            ],
-            { duration: 900, easing: "ease-in-out", pseudoElement: "::view-transition-new(root)" }
-          );
-        }).catch(() => { /* браузер мог прервать переход (например, вкладка стала невидимой) —
-          applyTheme(next) в апдейт-коллбэке уже отработал, анимация просто не понадобится */ });
-      };
-
-      // Уходящее светило (то, что было активно) проезжает по дуге вправо за кадр, а заступающее —
-      // одновременно заезжает по той же дуге слева (см. @keyframes sky-arc-exit/-enter в CSS), и
-      // ОДНОВРЕМЕННО с этим само небо под ними плавно перекрашивается в целевой градиент (--bg1/
-      // --bg2 — типизированы через @property в CSS, поэтому transition умеет анимировать сам цвет).
-      // Всё это — обычная CSS-анимация/transition на живом DOM, а не View Transitions: та на время
-      // своего перехода прячет живую страницу под статичный снимок, так что анимация на ней стала
-      // бы не видна. Поэтому дуга с перекраской неба сначала доигрывают целиком, и только потом
-      // стартует переход остального (текст, карточки) — круг от кнопки.
-      const sunEl = $(".sky-sun"), moonEl = $(".sky-moon");
-      if(reduceMotion || !sunEl || !moonEl){
-        runColorTransition();
-        return;
-      }
-      const target = readThemeGradient(next);
-      root.style.setProperty("--bg1", target.bg1);
-      root.style.setProperty("--bg2", target.bg2);
-      const enteringEl = next === "dark" ? moonEl : sunEl;
-      const exitingEl = next === "dark" ? sunEl : moonEl;
-      exitingEl.classList.add("sky-arc-exit");
-      enteringEl.classList.add("sky-arc-enter");
-      let done = false;
-      const finishArc = () => {
-        if(done) return;
-        done = true;
-        exitingEl.classList.remove("sky-arc-exit");
-        enteringEl.classList.remove("sky-arc-enter");
-        runColorTransition();
-      };
-      exitingEl.addEventListener("animationend", finishArc, { once: true });
-      setTimeout(finishArc, 750); // страховка, если animationend по какой-то причине не придёт
-    });
+  // Солнце "дома" при --sky-spin:0 (см. dx/dy в разметке) — но если реально стартуем в тёмной
+  // теме (сохранённой или системной), на загрузке дома должна быть луна. Выставляем поворот ДО
+  // первой отрисовки: у элемента ещё нет предыдущего кадра, чтобы transition из style.css вообще
+  // сработал, поэтому анимация тут не проигрывается — сразу нужное положение, без прыжка.
+  const root = document.documentElement;
+  const startIsDark = root.getAttribute("data-theme") === "dark"
+    || (root.getAttribute("data-theme") !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  if(startIsDark){
+    skySpin = 180;
+    $(".sky-orbit")?.style.setProperty("--sky-spin", skySpin);
   }
+  const btn = $("#themeToggle");
+  if(!btn) return;
+  btn.addEventListener("click", () => {
+    const root = document.documentElement;
+    const current = root.getAttribute("data-theme")
+      || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    const next = current === "dark" ? "light" : "dark";
+    localStorage.setItem(LS.theme, next);
+    // Один applyTheme() — дальше всё делают CSS-переходы: --bg1/--bg2/--night-opacity плавно
+    // едут сами (см. :root в style.css), фон/карточки/текст читают их или синхронизированы той
+    // же var(--sky-duration), а вращение солнца/луны ниже просто крутит .sky-orbit на 180°.
+    // Никакого View Transitions API/круга от кнопки больше нет — раньше он был нужен, чтобы
+    // спрятать мгновенную смену цвета под визуальный эффект, а теперь сама смена уже плавная и
+    // синхронная с дугой, прятать нечего.
+    applyTheme(next);
+    // --sky-spin обновляем ВСЕГДА, даже при prefers-reduced-motion — иначе солнце/луна навсегда
+    // застревают в положении по последнему повороту, а не по факту меняют тему (моргает только
+    // цвет). Саму анимацию поворота отключает CSS (.sky-orbit/.sky-body-spin{transition:none}
+    // под тем же media-query) — тут ничего дополнительно приглушать не нужно.
+    skySpin += 180;
+    $(".sky-orbit")?.style.setProperty("--sky-spin", skySpin);
+  });
 }
 
 // ====== НЕБО (звёзды на тёмном фоне) ======
@@ -243,6 +180,42 @@ function initSky(){
     frag.appendChild(star);
   }
   container.appendChild(frag);
+}
+
+// ====== ПАДАЮЩАЯ ЗВЕЗДА ======
+// Раз в 15-30с (случайно) — только ночью (иначе звёзд не видно, и падающая звезда на светлом
+// небе не имеет смысла); просто планируем следующую попытку и проверяем тему заново на каждом
+// срабатывании, а не один раз при загрузке. Позиция — случайная точка в верхней трети неба; угол
+// полёта — случайный, вниз-по-диагонали, чтобы траектория смотрелась естественно.
+function isNightSky(){
+  return parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--night-opacity")) > 0.5;
+}
+
+function spawnShootingStar(){
+  const layer = $("#skyShooting");
+  if(!layer || !isNightSky()) return;
+  const topPct = Math.random() * 33;
+  const leftPct = Math.random() * 90;
+  const angle = 20 + Math.random() * 45;
+  const wrap = document.createElement("div");
+  wrap.className = "sky-shooting-star";
+  wrap.style.top = `${topPct.toFixed(2)}%`;
+  wrap.style.left = `${leftPct.toFixed(2)}%`;
+  wrap.style.transform = `rotate(${angle.toFixed(1)}deg)`;
+  const anim = document.createElement("div");
+  anim.className = "sky-shooting-anim";
+  anim.addEventListener("animationend", () => wrap.remove());
+  wrap.appendChild(anim);
+  layer.appendChild(wrap);
+}
+
+function initShootingStars(){
+  if(window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const schedule = () => {
+    const delaySec = 15 + Math.random() * 15;
+    setTimeout(() => { spawnShootingStar(); schedule(); }, delaySec * 1000);
+  };
+  schedule();
 }
 
 // ====== СЧЁТЧИК ДО 1 ОКТЯБРЯ ======
@@ -1699,6 +1672,7 @@ export function initApp(opts){
   IS_ADMIN = !!(opts && opts.isAdmin);
   initTheme();
   initSky();
+  initShootingStars();
   initCountdown();
   initFirebase();
   renderAll();
