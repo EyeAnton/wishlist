@@ -116,13 +116,29 @@ function applyTheme(theme){
   }
 }
 
+// Целевые --bg1/--bg2 нужной темы, не имея их захардкоженными в JS (чтобы не разъезжались
+// с CSS): на мгновение выставляем [data-theme] в целевое значение, читаем computed style,
+// тут же возвращаем атрибут как было — всё синхронно, без единого кадра отрисовки между этим,
+// так что никакого мигания на странице не возникает.
+function readThemeGradient(theme){
+  const root = document.documentElement;
+  const prev = root.getAttribute("data-theme");
+  root.setAttribute("data-theme", theme);
+  const cs = getComputedStyle(root);
+  const bg1 = cs.getPropertyValue("--bg1").trim();
+  const bg2 = cs.getPropertyValue("--bg2").trim();
+  if(prev === null) root.removeAttribute("data-theme"); else root.setAttribute("data-theme", prev);
+  return { bg1, bg2 };
+}
+
 function initTheme(){
   const saved = localStorage.getItem(LS.theme);
   applyTheme(saved);
   const btn = $("#themeToggle");
   if(btn){
     btn.addEventListener("click", () => {
-      const current = document.documentElement.getAttribute("data-theme")
+      const root = document.documentElement;
+      const current = root.getAttribute("data-theme")
         || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
       const next = current === "dark" ? "light" : "dark";
       localStorage.setItem(LS.theme, next);
@@ -134,6 +150,8 @@ function initTheme(){
       const runColorTransition = () => {
         if(!document.startViewTransition || reduceMotion){
           applyTheme(next);
+          root.style.removeProperty("--bg1");
+          root.style.removeProperty("--bg2");
           return;
         }
         const rect = btn.getBoundingClientRect();
@@ -147,7 +165,14 @@ function initTheme(){
         // кнопку явно ДЕРЖИТСЯ на месте четверть секунды, прежде чем начать разлетаться — эту паузу
         // уже невозможно не заметить.
         const popRadius = Math.max(rect.width, rect.height) / 2 + 4;
-        const transition = document.startViewTransition(() => applyTheme(next));
+        const transition = document.startViewTransition(() => {
+          applyTheme(next);
+          // Небо уже перекрашено (см. --bg1/--bg2 ниже, выставлены ДО этого момента и уже
+          // доиграли свой переход) — снимаем inline-override, чтобы дальше цвет снова диктовало
+          // обычное правило :root[data-theme]. Значения совпадают, так что смены не видно.
+          root.style.removeProperty("--bg1");
+          root.style.removeProperty("--bg2");
+        });
         transition.ready.then(() => {
           document.documentElement.animate(
             [
@@ -163,16 +188,21 @@ function initTheme(){
       };
 
       // Уходящее светило (то, что было активно) проезжает по дуге вправо за кадр, а заступающее —
-      // одновременно заезжает по той же дуге слева (см. @keyframes sky-arc-exit/-enter в CSS).
-      // Это ОБЫЧНАЯ CSS-анимация на живом DOM, а не View Transitions — та на время своего перехода
-      // прячет живую страницу под статичный снимок, так что анимация на ней стала бы не видна.
-      // Поэтому дуга сначала доигрывает целиком, и только потом стартует переход цвета (круг от
-      // кнопки) — если запустить оба сразу, дугу никто не увидит.
+      // одновременно заезжает по той же дуге слева (см. @keyframes sky-arc-exit/-enter в CSS), и
+      // ОДНОВРЕМЕННО с этим само небо под ними плавно перекрашивается в целевой градиент (--bg1/
+      // --bg2 — типизированы через @property в CSS, поэтому transition умеет анимировать сам цвет).
+      // Всё это — обычная CSS-анимация/transition на живом DOM, а не View Transitions: та на время
+      // своего перехода прячет живую страницу под статичный снимок, так что анимация на ней стала
+      // бы не видна. Поэтому дуга с перекраской неба сначала доигрывают целиком, и только потом
+      // стартует переход остального (текст, карточки) — круг от кнопки.
       const sunEl = $(".sky-sun"), moonEl = $(".sky-moon");
       if(reduceMotion || !sunEl || !moonEl){
         runColorTransition();
         return;
       }
+      const target = readThemeGradient(next);
+      root.style.setProperty("--bg1", target.bg1);
+      root.style.setProperty("--bg2", target.bg2);
       const enteringEl = next === "dark" ? moonEl : sunEl;
       const exitingEl = next === "dark" ? sunEl : moonEl;
       exitingEl.classList.add("sky-arc-exit");
