@@ -1564,6 +1564,14 @@ function peopleWord(n){
   return "человек";
 }
 
+// "1 человек выбрал" (ед. число), но "2/5/11 человек выбрали" (мн. число) — отдельное согласование
+// от peopleWord(), у глагола своё правило (единственное только когда число оканчивается на 1, но
+// не на 11).
+function chooseVerb(n){
+  const mod10 = n % 10, mod100 = n % 100;
+  return (mod10 === 1 && mod100 !== 11) ? "выбрал" : "выбрали";
+}
+
 // Компактная кнопка отмены — серый крестик, на десктопе разворачивается в "Отменить" при
 // наведении (на тач-устройствах наведения нет, крестик так и остаётся компактным, но кликабелен).
 const CANCEL_X_BTN = `<button class="cancel-x-btn cancelReserveBtn" title="Отменить" aria-label="Отменить"><span class="cancel-x-icon">✕</span><span class="cancel-x-label">Отменить</span></button>`;
@@ -1594,7 +1602,7 @@ function renderCardFooter(item){
     // пытаясь встать в 100% ширины ПЕРЕД остальными элементами строки.
     const count = item.reservedByMulti ? Object.keys(item.reservedByMulti).length : 0;
     return `
-      ${count > 0 ? `<span class="reserved-badge">🎁 ${count} ${peopleWord(count)} выбрали это</span>` : ""}
+      ${count > 0 ? `<span class="reserved-badge">🎁 ${count} ${peopleWord(count)} ${chooseVerb(count)} это</span>` : ""}
       ${count > 0 ? CANCEL_X_BTN : ""}
       <button class="full-btn reserveBtn">Хочу подарить</button>
     `;
