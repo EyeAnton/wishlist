@@ -1,8 +1,9 @@
-/* @property делает --bg1/--bg2/--night-opacity "типизированными" (а не произвольным текстовым
+/* @property делает все цветовые переменные ниже "типизированными" (а не произвольным текстовым
    токеном) — только так браузер умеет плавно интерполировать значение через transition, а не
    мгновенно подменять его на конечное.
-   Эти три переменные анимируются ПРЯМО ЗДЕСЬ, на :root (где их значение и меняется по
-   [data-theme]), а не через transition на потребляющих их элементах:
+   ВСЕ они анимируются ПРЯМО ЗДЕСЬ, на :root (где их значение и меняется по [data-theme]), а НЕ
+   через transition на потребляющих их элементах — раньше было наоборот (общее правило transition
+   висело на теле, кнопках, карточках и т.д.), и это оказалось хрупко сразу в трёх местах:
    - transition, объявленный на элементе с background:linear-gradient(...) (как .sky-layer ниже),
      вообще не запускается — CSS не умеет анимировать один градиент в другой как единое значение
      (проверено: getAnimations() на таком элементе возвращал пустой список — анимация даже не
@@ -11,29 +12,64 @@
      .sky-moon-shadow) ПОВЕРХ уже анимирующегося --bg2, получится двойной переход: элемент
      начинает "догонять" каждый кадр уже двигающееся значение с собственной задержкой поверх — на
      глаз это выглядит, будто он отстаёт от остального неба и меняется медленнее фона.
-   Правильно — анимировать САМ ИСТОЧНИК один раз здесь, а все потребители просто читают его через
-   var() без собственного transition (.sky-layer, .sky-moon-shadow) либо синхронизированы с той
-   же var(--sky-duration) linear (см. общее правило transition ниже — тот же принцип и та же
-   переменная не дают скорости разъехаться). */
+   - более специфичные правила ниже по каскаду (например button{transition:background .15s,...})
+     молча ПЕРЕКРЫВАЛИ общее правило целиком (transition не суммируется — побеждает последнее
+     объявление той же специфичности или выше), так что все кнопки на сайте на самом деле меняли
+     цвет за .15s, а не за var(--sky-duration), несмотря на общее правило "для всех".
+   Централизация решает все три сразу: анимируется САМ ИСТОЧНИК один раз здесь, а все потребители
+   (body, кнопки, карточки, календарь, тосты, подсказки, что угодно) просто читают его через var()
+   без единого собственного transition на background/color/border-color/box-shadow — значит, и
+   перекрыть эту анимацию более специфичным правилом больше нечем. Element-level transition
+   остаётся только для НЕ-цветовых, чисто интерактивных вещей (transform на hover/press,
+   padding/gap у .cancel-x-btn) — они намеренно быстрее и не связаны со сменой темы. */
 @property --bg1{syntax:'<color>'; inherits:true; initial-value:#fdf2f8;}
 @property --bg2{syntax:'<color>'; inherits:true; initial-value:#eef2ff;}
 @property --night-opacity{syntax:'<number>'; inherits:true; initial-value:0;}
+@property --card{syntax:'<color>'; inherits:true; initial-value:#ededed;}
+@property --text{syntax:'<color>'; inherits:true; initial-value:#2d2a3a;}
+@property --muted{syntax:'<color>'; inherits:true; initial-value:#8b8794;}
+@property --accent-solid{syntax:'<color>'; inherits:true; initial-value:#e8823f;}
+@property --accent-hover{syntax:'<color>'; inherits:true; initial-value:#d16f2f;}
+@property --border{syntax:'<color>'; inherits:true; initial-value:#eee3ea;}
+@property --danger{syntax:'<color>'; inherits:true; initial-value:#d9455f;}
+@property --card-img-bg{syntax:'<color>'; inherits:true; initial-value:#ffffff;}
+@property --modal-bg{syntax:'<color>'; inherits:true; initial-value:#ffffff;}
+@property --input-bg{syntax:'<color>'; inherits:true; initial-value:#fdfbfc;}
+@property --reserved-bg{syntax:'<color>'; inherits:true; initial-value:#f1e9ff;}
+@property --reserved-text{syntax:'<color>'; inherits:true; initial-value:#6b4fa3;}
+@property --toast-bg{syntax:'<color>'; inherits:true; initial-value:#2d2a3a;}
+@property --toast-text{syntax:'<color>'; inherits:true; initial-value:#ffffff;}
+@property --overlay-bg{syntax:'<color>'; inherits:true; initial-value:rgba(30,20,30,.45);}
+/* --shadow сам по себе (offset+blur+color) типизировать нельзя — у @property нет синтаксиса для
+   "тени" как единого целого, только простые типы вроде <color>. Поэтому цвет тени вынесен в
+   отдельную --shadow-color (типизирована, анимируется), а --shadow просто собирает готовую тень
+   из неё — box-shadow:var(--shadow) у любого элемента как и раньше пересобирается на лету. */
+@property --shadow-color{syntax:'<color>'; inherits:true; initial-value:rgba(60,20,50,.08);}
 :root{
   /* Единая длительность/тайминг для ВСЕГО, что синхронизировано со сменой темы: сам градиент
-     неба, звёзды, вращение солнца/луны и обычные цветные поверхности (см. общее правило
-     transition ниже) — меняются в одном месте, так что скорости физически не могут разъехаться.
+     неба, звёзды, вращение солнца/луны и все цветные поверхности (см. список в transition ниже)
+     — меняются в одном месте, так что скорости физически не могут разъехаться.
      linear — не та же кривая, что у вращения: у цвета всего 0-255 на канал, и он визуально
      "доезжает" до конечного оттенка задолго до 100% eased-прогресса той же cubic-bezier, отсюда и
      ощущение, что фон меняется быстрее вращения при одинаковом duration. linear меняется
      равномерно всю длительность. */
-  --sky-duration:2.2s;
+  --sky-duration:1.1s;
   --sky-easing:cubic-bezier(.4,0,.2,1);
-  transition:--bg1 var(--sky-duration) linear, --bg2 var(--sky-duration) linear, --night-opacity var(--sky-duration) linear;
+  transition:
+    --bg1 var(--sky-duration) linear, --bg2 var(--sky-duration) linear,
+    --night-opacity var(--sky-duration) linear,
+    --card var(--sky-duration) linear, --text var(--sky-duration) linear, --muted var(--sky-duration) linear,
+    --accent-solid var(--sky-duration) linear, --accent-hover var(--sky-duration) linear,
+    --border var(--sky-duration) linear, --danger var(--sky-duration) linear,
+    --card-img-bg var(--sky-duration) linear, --modal-bg var(--sky-duration) linear, --input-bg var(--sky-duration) linear,
+    --reserved-bg var(--sky-duration) linear, --reserved-text var(--sky-duration) linear,
+    --toast-bg var(--sky-duration) linear, --toast-text var(--sky-duration) linear,
+    --overlay-bg var(--sky-duration) linear, --shadow-color var(--sky-duration) linear;
   --bg1:#fdf2f8; --bg2:#eef2ff;
   --card:#ededed; --text:#2d2a3a; --muted:#8b8794;
   --accent:#e8823f; --accent-solid:#e8823f; --accent-hover:#d16f2f;
   --border:#eee3ea; --ok:#3fa672; --danger:#d9455f;
-  --shadow:0 4px 20px rgba(60,20,50,.08);
+  --shadow-color:rgba(60,20,50,.08); --shadow:0 4px 20px var(--shadow-color);
   --radius:16px;
   --card-img-bg:#ffffff;
   --modal-bg:#ffffff;
@@ -50,7 +86,7 @@
     --card:#221d2b; --text:#f0eef5; --muted:#a79fb5;
     --accent:#ff9d54; --accent-solid:#ff9d54; --accent-hover:#ffb374;
     --border:#3a3345; --ok:#4cc98a; --danger:#ff6b7a;
-    --shadow:0 4px 20px rgba(0,0,0,.4);
+    --shadow-color:rgba(0,0,0,.4); --shadow:0 4px 20px var(--shadow-color);
     --card-img-bg:#2c2636;
     --modal-bg:#221d2b;
     --input-bg:#2a2432;
@@ -69,7 +105,7 @@
   --card:#221d2b; --text:#f0eef5; --muted:#a79fb5;
   --accent:#ff9d54; --accent-solid:#ff9d54; --accent-hover:#ffb374;
   --border:#3a3345; --ok:#4cc98a; --danger:#ff6b7a;
-  --shadow:0 4px 20px rgba(0,0,0,.4);
+  --shadow-color:rgba(0,0,0,.4); --shadow:0 4px 20px var(--shadow-color);
   --card-img-bg:#2c2636;
   --modal-bg:#221d2b;
   --input-bg:#2a2432;
@@ -86,19 +122,6 @@
    мобильный браузер подсвечивает весь bounding box элемента по тапу (игнорируя border-radius —
    поэтому на круглых кнопках это выглядит особенно чужеродно, квадратом поверх круга). */
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
-/* Плавный переход цвета для всего, что меняется темой — на той же var(--sky-duration) linear,
-   что и небо/солнце/луна (см. :root выше), а не на отдельной короткой .35s: иначе эти
-   поверхности долистывают тему за доли секунды и заметно обгоняют дугу солнца/луны, а глаз
-   читает это как "всё остальное меняется отдельно и намного быстрее". Там, где уже есть
-   собственный transition с нужными свойствами (например .cancel-x-btn), он просто перекрывает
-   это правило по специфичности селектора — конфликта нет. */
-body, button, a, input, select, textarea,
-header.topbar h1,
-.card, .card-body, .filters-bar, .filter-chip, .calendar-cell, .calendar-cell-dow,
-.reserved-badge, .modal, .toast, .theme-switch, .theme-switch-knob{
-  transition:background-color var(--sky-duration) linear, border-color var(--sky-duration) linear,
-    color var(--sky-duration) linear, box-shadow var(--sky-duration) linear;
-}
 body{
   margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   color:var(--text); min-height:100vh;
@@ -308,7 +331,12 @@ header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; g
    наезжает на одну из них, скрывая её, в зависимости от текущей темы. */
 .theme-switch{
   position:relative; width:44px; height:24px; padding:0; flex:none;
-  border-radius:12px; background:var(--border); border:none; cursor:pointer; transition:background .2s;
+  border-radius:12px; background:var(--border); border:none; cursor:pointer;
+  /* Без своего transition на background — --border/--accent-solid ([aria-checked=true] ниже) уже
+     сами плавно едут при смене темы (см. верх файла), а переключение [aria-checked] происходит
+     синхронно с этим же кликом, так что смена того, ЧТО именно сейчас читается, приходится ровно
+     на момент, когда обе переменные и так синхронно едут к новым значениям — свой transition тут
+     был бы лишним и тормозил бы, как и у кнопок. */
 }
 .theme-switch:hover{background:var(--border);}
 .theme-switch-sun, .theme-switch-moon{
@@ -342,7 +370,13 @@ select{
 select::-ms-expand{display:none;}
 button{
   font:inherit; cursor:pointer; border:none; border-radius:10px; padding:10px 16px;
-  background:var(--accent-solid); color:#fff; transition:background .15s, transform .1s;
+  background:var(--accent-solid); color:#fff;
+  /* Раньше тут был transition:background .15s — но background:var(--accent-solid) читает
+     переменную, которая теперь сама плавно едет на var(--sky-duration) при смене темы (см. верх
+     файла); свой transition на background поверх этого только гонится за уже двигающимся
+     значением и тормозит кнопку относительно остального сайта. Hover (:hover ниже) просто
+     мгновенно подменяет цвет — это отдельное, не связанное с темой взаимодействие. */
+  transition:transform .1s;
 }
 button:hover{background:var(--accent-hover);}
 button:active{transform:scale(.97);}
@@ -457,10 +491,16 @@ button:disabled{opacity:.55; cursor:not-allowed;}
 .popup-contacts .contact-btn{
   display:inline-flex; align-items:center; gap:8px; font-size:.88rem; font-weight:600;
   padding:10px 14px; border-radius:10px; background:var(--input-bg); border:1px solid var(--border);
-  color:var(--text); text-decoration:none; transition:background .15s, border-color .15s, color .15s;
+  color:var(--text); text-decoration:none;
+  /* В покое — синхронно с темой (var(--sky-duration)); на hover ниже переопределяется быстрым
+     .15s под интерактив, как у .cancel-x-btn выше. */
+  transition:background var(--sky-duration) linear, border-color var(--sky-duration) linear, color var(--sky-duration) linear;
 }
 .popup-contacts .contact-btn svg{width:16px; height:16px; flex:none;}
-.popup-contacts .contact-btn:hover{border-color:var(--accent-solid); color:var(--accent-solid); background:var(--card);}
+.popup-contacts .contact-btn:hover{
+  border-color:var(--accent-solid); color:var(--accent-solid); background:var(--card);
+  transition:background .15s, border-color .15s, color .15s;
+}
 .intro-text{color:var(--text); font-size:.92rem; line-height:1.42; margin:0 0 7px;}
 .intro-text strong{color:var(--text);}
 .reserved-badge{
@@ -474,7 +514,11 @@ button:disabled{opacity:.55; cursor:not-allowed;}
   display:inline-flex; align-items:center; gap:0; overflow:hidden; flex:none;
   height:28px; padding:0 7px; border-radius:14px; font:inherit; white-space:nowrap;
   background:transparent; border:1px solid var(--border); color:var(--muted);
-  transition:background .15s, color .15s, border-color .15s, padding .2s ease, gap .2s ease;
+  /* В покое border-color/color синхронизированы с темой (var(--border)/var(--muted) сами едут
+     на var(--sky-duration) — см. верх файла); background/padding/gap тут ни при чём в покое
+     (background всегда transparent, пока не навели курсор), их скорость реальна только на hover
+     ниже, где transition переопределяется целиком под интерактив (все свойства — быстро). */
+  transition:border-color var(--sky-duration) linear, color var(--sky-duration) linear;
 }
 .cancel-x-icon{font-size:.75rem; line-height:1; flex:none;}
 .cancel-x-label{
@@ -482,7 +526,10 @@ button:disabled{opacity:.55; cursor:not-allowed;}
   transition:max-width .25s ease, opacity .15s ease;
   font-size:.78rem; font-weight:600;
 }
-.cancel-x-btn:hover{background:var(--danger); border-color:var(--danger); color:#fff; padding:0 12px 0 10px; gap:6px;}
+.cancel-x-btn:hover{
+  background:var(--danger); border-color:var(--danger); color:#fff; padding:0 12px 0 10px; gap:6px;
+  transition:background .15s, color .15s, border-color .15s, padding .2s ease, gap .2s ease;
+}
 .cancel-x-btn:hover .cancel-x-label{max-width:100px; opacity:1; transition:max-width .25s ease, opacity .2s ease .08s;}
 .owner-actions{position:absolute; top:8px; right:8px; display:flex; gap:6px; z-index:3;}
 .owner-actions button{padding:6px 9px; font-size:.85rem; border-radius:8px;}
