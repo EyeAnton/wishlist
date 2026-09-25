@@ -438,10 +438,37 @@ button:disabled{opacity:.55; cursor:not-allowed;}
 }
 .filter-chip{display:inline-flex; align-items:center; gap:8px; font-size:.9rem; color:var(--text); cursor:pointer; user-select:none;}
 .marketplace-label-short{display:none;}
-.filter-chip input{
-  accent-color:var(--accent-solid); width:15px; height:15px; cursor:pointer; margin:0;
-  transition:accent-color var(--sky-duration) linear;
+/* Раньше был accent-color:var(--accent-solid) — фон нативного чекбокса им перекрашивается
+   плавно, а вот сама галочка внутри рисуется браузером как часть нативного виджета и никаким
+   CSS-transition не ловится (это не отдельный красящийся элемент) — на глаз казалось, что фон
+   плывёт, а галочка "прыгает" отдельно от него. appearance:none снимает нативную отрисовку
+   целиком, а галочку/точку радио рисуем сами через ::after — тогда абсолютно всё (фон, рамка,
+   сама отметка) под одним и тем же принципом плавности.
+   БЕЗ собственного transition на background-color/border-color — --input-bg/--border/
+   --accent-solid уже сами плавно едут на :root (см. начало файла), а свой transition тут ПОВЕРХ
+   уже анимирующегося значения — тот самый двойной переход, который специально убирали по всему
+   сайту в прошлый раз (см. комментарий про @property --bg2 в начале файла): элемент начинает
+   заново "догонять" каждый кадр уже двигающееся значение и либо тормозит, либо, как здесь,
+   анимация вообще не стартует (getAnimations() возвращал пустой список). Просто читаем текущие
+   (уже сглаженные) переменные. */
+.filter-chip input[type="checkbox"], .filter-chip input[type="radio"]{
+  appearance:none; -webkit-appearance:none; margin:0; cursor:pointer; flex:none;
+  width:15px; height:15px; border:1.5px solid var(--border); background:var(--input-bg); position:relative;
 }
+.filter-chip input[type="checkbox"]{border-radius:4px;}
+.filter-chip input[type="radio"]{border-radius:50%;}
+.filter-chip input[type="checkbox"]::after{
+  content:""; position:absolute; inset:0; opacity:0; transition:opacity .15s ease;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='3.5 8.5 6.5 11.5 12.5 4.5'/%3E%3C/svg%3E") center/10px no-repeat;
+}
+.filter-chip input[type="radio"]::after{
+  content:""; position:absolute; inset:3px; border-radius:50%; background:#fff; opacity:0; transition:opacity .15s ease;
+}
+.filter-chip input[type="checkbox"]:checked, .filter-chip input[type="radio"]:checked{
+  background-color:var(--accent-solid); border-color:var(--accent-solid);
+}
+.filter-chip input[type="checkbox"]:checked::after, .filter-chip input[type="radio"]:checked::after{opacity:1;}
+.filter-chip input:focus-visible{outline:2px solid var(--accent-solid); outline-offset:2px;}
 .grid{
   display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:18px;
 }
