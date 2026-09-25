@@ -543,17 +543,15 @@ button:disabled{opacity:.55; cursor:not-allowed;}
 .popup-contacts-btns{display:flex; gap:10px; flex-wrap:wrap; justify-content:center;}
 .popup-contacts .contact-btn{
   display:inline-flex; align-items:center; gap:8px; font-size:.88rem; font-weight:600;
-  padding:10px 14px; border-radius:10px; background:var(--input-bg); border:1px solid var(--border);
-  color:var(--text); text-decoration:none;
-  /* В покое БЕЗ собственного transition — background/border-color/color тут читают уже
-     анимирующиеся на :root var(--input-bg)/var(--border)/var(--text) (см. начало файла), а свой
-     transition поверх них — тот самый двойной переход: элемент заново стартует мини-переход
-     каждый кадр, из-за чего цвет визуально дёргается вместо плавного хода. На hover ниже —
-     отдельный быстрый .15s под интерактив, как у .cancel-x-btn выше. */
+  padding:10px 14px; border-radius:10px; text-decoration:none;
+  /* По просьбе — эти кнопки вообще не участвуют в смене темы: фиксированные (не var())
+     светлые цвета что при светлой, что при тёмной теме, вместо того чтобы плавно ехать вместе
+     со всем остальным сайтом. */
+  background:#fdfbfc; border:1px solid #eee3ea; color:#2d2a3a;
 }
 .popup-contacts .contact-btn svg{width:16px; height:16px; flex:none;}
 .popup-contacts .contact-btn:hover{
-  border-color:var(--accent-solid); color:var(--accent-solid); background:var(--card);
+  border-color:#e8823f; color:#e8823f; background:#ededed;
   transition:background .15s, border-color .15s, color .15s;
 }
 .intro-text{color:var(--text); font-size:.92rem; line-height:1.42; margin:0 0 7px;}
