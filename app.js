@@ -90,6 +90,24 @@ function escapeHtml(str){
   return String(str).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
 
+// Превращает голые ссылки в тексте заметки (например, "по ссылке - рубли\nhttps://...")
+// в кликабельные <a>, остальной текст экранирует как обычно. Работает на СЫРОМ тексте (до
+// экранирования) — split с ловящей группой возвращает [текст, ссылка, текст, ссылка, ...], чётные
+// индексы экранируем как есть, нечётные — оборачиваем в ссылку (сам href тоже экранирован).
+const URL_REGEX = /(https?:\/\/[^\s<>"]+)/g;
+function linkifyText(str){
+  if(str === null || str === undefined) return "";
+  return String(str).split(URL_REGEX).map((part, i) => {
+    if(i % 2 === 0) return escapeHtml(part);
+    // Хвостовая пунктуация (точка/запятая/скобка и т.п.) после ссылки в прозе обычно не часть
+    // самого URL — отрезаем её от ссылки, но оставляем в тексте.
+    const trailingMatch = part.match(/[.,;:!?)\]'"]+$/);
+    const trailing = trailingMatch ? trailingMatch[0] : "";
+    const url = trailing ? part.slice(0, -trailing.length) : part;
+    return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a>${escapeHtml(trailing)}`;
+  }).join("");
+}
+
 function uid(){
   return (crypto.randomUUID ? crypto.randomUUID() : "id-" + Date.now() + "-" + Math.random().toString(16).slice(2));
 }
@@ -1195,7 +1213,7 @@ function openDetailModal(item){
     <h3>${escapeHtml(item.title)}</h3>
     ${price ? `<div class="card-price" style="font-size:1.15rem;margin-bottom:10px;">${escapeHtml(price)}</div>` : ""}
     ${reservedLine}
-    ${item.note ? `<p class="card-note" style="white-space:pre-wrap;">${escapeHtml(item.note)}</p>` : ""}
+    ${item.note ? `<p class="card-note" style="white-space:pre-wrap;">${linkifyText(item.note)}</p>` : ""}
     ${item.link ? `<div class="card-link" style="margin:10px 0;"><a href="${escapeHtml(item.link)}" target="_blank" rel="noopener">Открыть ссылку →</a></div>` : ""}
     <div class="modal-actions" id="detailActions"></div>
   `, overlay => {
@@ -1550,7 +1568,7 @@ function renderCard(item){
           ? `<a href="${escapeHtml(item.link)}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a>`
           : escapeHtml(item.title)}</p>
         ${price ? `<div class="card-price">${escapeHtml(price)}</div>` : ""}
-        ${item.note ? `<p class="card-note card-note-clamp">${escapeHtml(item.note)}</p>` : ""}
+        ${item.note ? `<p class="card-note card-note-clamp">${linkifyText(item.note)}</p>` : ""}
         <div class="card-footer">
           ${renderCardFooter(item)}
         </div>
