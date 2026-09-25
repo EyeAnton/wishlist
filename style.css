@@ -533,9 +533,11 @@ button:disabled{opacity:.55; cursor:not-allowed;}
 .card-link a:hover{text-decoration:underline;}
 .card-footer{margin-top:auto; padding-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
 .card-contacts{display:flex; gap:14px; margin-top:10px; padding-top:10px; border-top:1px solid var(--border);}
-.contact-link{font-size:.8rem; color:var(--muted); text-decoration:none; display:inline-flex; align-items:center; gap:4px;}
+/* Фиксированный (не var()) цвет — по той же просьбе, что и .popup-contacts .contact-btn ниже:
+   контакты Антон/Лера не должны участвовать в смене темы вообще, ни в шапке, ни в карточках. */
+.contact-link{font-size:.8rem; color:#8b8794; text-decoration:none; display:inline-flex; align-items:center; gap:4px;}
 .contact-link svg{width:14px; height:14px; flex:none;}
-.contact-link:hover{color:var(--accent-solid); text-decoration:underline;}
+.contact-link:hover{color:#e8823f; text-decoration:underline;}
 /* Один общий подписи "Написать:" по центру, кнопки-контакты под ней в ряд — компактнее,
    чем повторять "Написать:" в каждой кнопке. */
 .popup-contacts{margin-top:6px; text-align:center;}
