@@ -545,9 +545,11 @@ button:disabled{opacity:.55; cursor:not-allowed;}
   display:inline-flex; align-items:center; gap:8px; font-size:.88rem; font-weight:600;
   padding:10px 14px; border-radius:10px; background:var(--input-bg); border:1px solid var(--border);
   color:var(--text); text-decoration:none;
-  /* В покое — синхронно с темой (var(--sky-duration)); на hover ниже переопределяется быстрым
-     .15s под интерактив, как у .cancel-x-btn выше. */
-  transition:background var(--sky-duration) linear, border-color var(--sky-duration) linear, color var(--sky-duration) linear;
+  /* В покое БЕЗ собственного transition — background/border-color/color тут читают уже
+     анимирующиеся на :root var(--input-bg)/var(--border)/var(--text) (см. начало файла), а свой
+     transition поверх них — тот самый двойной переход: элемент заново стартует мини-переход
+     каждый кадр, из-за чего цвет визуально дёргается вместо плавного хода. На hover ниже —
+     отдельный быстрый .15s под интерактив, как у .cancel-x-btn выше. */
 }
 .popup-contacts .contact-btn svg{width:16px; height:16px; flex:none;}
 .popup-contacts .contact-btn:hover{
@@ -567,11 +569,12 @@ button:disabled{opacity:.55; cursor:not-allowed;}
   display:inline-flex; align-items:center; gap:0; overflow:hidden; flex:none;
   height:28px; padding:0 7px; border-radius:14px; font:inherit; white-space:nowrap;
   background:transparent; border:1px solid var(--border); color:var(--muted);
-  /* В покое border-color/color синхронизированы с темой (var(--border)/var(--muted) сами едут
-     на var(--sky-duration) — см. верх файла); background/padding/gap тут ни при чём в покое
-     (background всегда transparent, пока не навели курсор), их скорость реальна только на hover
-     ниже, где transition переопределяется целиком под интерактив (все свойства — быстро). */
-  transition:border-color var(--sky-duration) linear, color var(--sky-duration) linear;
+  /* В покое БЕЗ собственного transition — border-color/color тут читают уже анимирующиеся на
+     :root var(--border)/var(--muted) (см. начало файла); свой transition поверх них — двойной
+     переход (getAnimations() на этом элементе возвращал пустой список, анимация не стартовала).
+     background/padding/gap тут ни при чём в покое (background всегда transparent, пока не навели
+     курсор), их скорость реальна только на hover ниже, где transition переопределяется целиком
+     под интерактив (все свойства — быстро). */
 }
 .cancel-x-icon{font-size:.75rem; line-height:1; flex:none;}
 .cancel-x-label{
