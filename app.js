@@ -72,7 +72,7 @@ document.addEventListener("click", e => {
 });
 
 const NO_CATEGORY = "Без категории";
-const FIXED_CATEGORIES = ["Вайбкодинг", "Настолки", "Кофе", "Подписки", "Книги", "Одежда", "Хобби"];
+const FIXED_CATEGORIES = ["Вайбкодинг", "Настолки", "Кофе", "Сертификаты", "Книги", "Одежда", "Хобби"];
 
 function categoryOf(item){
   return (item.category && item.category.trim()) ? item.category.trim() : NO_CATEGORY;
@@ -908,6 +908,11 @@ function openItemModal(existingItem){
       <small>Вместо "уже дарят" гости увидят счётчик "N человек выбрали это" и смогут присоединиться.</small>
     </div>
     <div class="field">
+      <label>Закрепить в начале списка (порядок)</label>
+      <input type="number" id="fPinOrder" value="${item.pinned === true ? "0" : (typeof item.pinned === "number" ? item.pinned : "")}" placeholder="Не закреплено">
+      <small>Чем меньше число — тем раньше товар в списке (закреплённые всегда идут перед остальными). Пусто — обычный порядок.</small>
+    </div>
+    <div class="field">
       <label>Цена</label>
       <div class="price-row">
         <input type="number" step="0.01" id="fPriceAmount" value="${escapeHtml(initialAmount)}" placeholder="0">
@@ -1047,6 +1052,7 @@ function openItemModal(existingItem){
       const amountRaw = overlay.querySelector("#fPriceAmount").value.trim();
       const imagesList = overlay.querySelector("#fImages").value
         .split("\n").map(s => s.trim()).filter(Boolean);
+      const pinOrderRaw = overlay.querySelector("#fPinOrder").value.trim();
       const data = {
         title,
         category: overlay.querySelector("#fCategory").value.trim() || null,
@@ -1058,6 +1064,7 @@ function openItemModal(existingItem){
         priceCurrency: amountRaw ? overlay.querySelector("#fPriceCurrency").value : null,
         price: null, // на случай редактирования старой записи со старым текстовым полем цены
         allowMultiple: overlay.querySelector("#fAllowMultiple").checked || null,
+        pinned: pinOrderRaw ? Number(pinOrderRaw) : null,
       };
       const saveBtn = overlay.querySelector("#saveItem");
       await withLoadingButton(saveBtn, async () => {
@@ -1391,8 +1398,10 @@ function renderMain(){
     });
   }
   // Закреплённые товары всегда идут первыми, независимо от сортировки — сортировка стабильна,
-  // так что порядок среди остальных не трогаем.
-  visibleItems = visibleItems.slice().sort((a, b) => (a.pinned ? 0 : 1) - (b.pinned ? 0 : 1));
+  // так что порядок среди остальных не трогаем. pinned может быть числом (явный ранг — чем
+  // меньше, тем раньше) или просто true (старый формат, без конкретного места в очереди).
+  const pinRank = item => item.pinned === true ? 0 : (typeof item.pinned === "number" ? item.pinned : Infinity);
+  visibleItems = visibleItems.slice().sort((a, b) => pinRank(a) - pinRank(b));
 
   // Заголовки дропдаунов фиксированные ("Сортировка"/"Категории") и не отражают текущий
   // выбор — раньше там был текущий вариант, и это смотрелось странно (особенно с длинными названиями).
