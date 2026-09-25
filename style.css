@@ -438,7 +438,10 @@ button:disabled{opacity:.55; cursor:not-allowed;}
 }
 .filter-chip{display:inline-flex; align-items:center; gap:8px; font-size:.9rem; color:var(--text); cursor:pointer; user-select:none;}
 .marketplace-label-short{display:none;}
-.filter-chip input{accent-color:var(--accent-solid); width:15px; height:15px; cursor:pointer; margin:0;}
+.filter-chip input{
+  accent-color:var(--accent-solid); width:15px; height:15px; cursor:pointer; margin:0;
+  transition:accent-color var(--sky-duration) linear;
+}
 .grid{
   display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:18px;
 }
@@ -475,6 +478,29 @@ button:disabled{opacity:.55; cursor:not-allowed;}
 .card-note-more{
   display:inline-block; margin-top:2px; color:var(--accent-solid); font-size:.85rem; font-weight:600; cursor:pointer;
 }
+/* Номер карты / адрес кошелька в заметке — отдельным прямоугольником, с кнопкой копирования в
+   правом верхнем углу (позиция top/right абсолютная — не съезжает, даже если значение переносится
+   на вторую строку на узком экране). Только в модалке с деталями — в обрезанном превью карточки
+   блочный элемент внутри -webkit-line-clamp мог бы визуально ломать подсчёт строк. */
+.note-copy-box{
+  position:relative; display:block; margin:6px 0; padding:8px 38px 8px 12px;
+  background:var(--input-bg); border:1px solid var(--border); border-radius:8px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.82rem; line-height:1.4;
+  color:var(--text); word-break:break-all;
+}
+.note-copy-btn{
+  position:absolute; top:6px; right:6px; width:26px; height:26px; padding:0;
+  display:inline-flex; align-items:center; justify-content:center;
+  background:var(--card); border:1px solid var(--border); border-radius:6px; color:var(--muted); cursor:pointer;
+}
+.note-copy-btn:hover{background:var(--accent-solid); color:#fff; border-color:var(--accent-solid);}
+.note-copy-btn:active{transform:scale(.92);}
+.note-copy-btn svg{width:14px; height:14px; display:block;}
+/* Всплывающее "Скопировано" — тот же .toast (фикс-позиция, ничего не блокирует), но с коротким
+   таймингом: 1с полностью видно, затем 0.5с плавно гаснет (класс .toast-copied-fade добавляется
+   через JS) и элемент удаляется — итого ровно 1.5с на весь попап. */
+.toast-copied{transition:opacity .5s ease;}
+.toast-copied-fade{opacity:0;}
 .card-note-more:hover{text-decoration:underline;}
 .card-link a{color:var(--accent-solid); font-size:.88rem; text-decoration:none;}
 .card-link a:hover{text-decoration:underline;}

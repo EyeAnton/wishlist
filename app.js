@@ -90,6 +90,74 @@ function escapeHtml(str){
   return String(str).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
 
+// Превращает голые ссылки в тексте заметки (например, "по ссылке - рубли\nhttps://...")
+// в кликабельные <a>, остальной текст экранирует как обычно. Работает на СЫРОМ тексте (до
+// экранирования) — split с ловящей группой возвращает [текст, ссылка, текст, ссылка, ...], чётные
+// индексы экранируем как есть, нечётные — оборачиваем в ссылку (сам href тоже экранирован).
+const URL_REGEX = /(https?:\/\/[^\s<>"]+)/g;
+function linkifyText(str){
+  if(str === null || str === undefined) return "";
+  return String(str).split(URL_REGEX).map((part, i) => {
+    if(i % 2 === 0) return escapeHtml(part);
+    // Хвостовая пунктуация (точка/запятая/скобка и т.п.) после ссылки в прозе обычно не часть
+    // самого URL — отрезаем её от ссылки, но оставляем в тексте.
+    const trailingMatch = part.match(/[.,;:!?)\]'"]+$/);
+    const trailing = trailingMatch ? trailingMatch[0] : "";
+    const url = trailing ? part.slice(0, -trailing.length) : part;
+    return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a>${escapeHtml(trailing)}`;
+  }).join("");
+}
+
+const NOTE_COPY_ICON = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M4.5 13H3.8A1.8 1.8 0 0 1 2 11.2V3.8A1.8 1.8 0 0 1 3.8 2h7.4A1.8 1.8 0 0 1 13 3.8v.7"/></svg>`;
+
+// Номер карты (12-19 цифр подряд) или адрес крипто-кошелька (длинный алфанумерик-токен) —
+// оборачиваем в прямоугольник с кнопкой копирования (см. .note-copy-box в CSS). Ссылки — как и в
+// linkifyText, кликабельным <a>. Всё остальное экранируется как обычно. Только для детальной
+// модалки (openDetailModal) — в обрезанном превью карточки блочный элемент внутри
+// -webkit-line-clamp мог бы визуально ломать подсчёт строк, поэтому там по-прежнему linkifyText.
+const NOTE_TOKEN_REGEX = /(https?:\/\/[^\s<>"]+)|\b(\d[\d ]{10,18}\d)\b|\b([A-Za-z0-9_-]{20,})\b/g;
+function renderNoteWithCopyBoxes(str){
+  if(str === null || str === undefined) return "";
+  const text = String(str);
+  let html = "", lastIndex = 0, m;
+  NOTE_TOKEN_REGEX.lastIndex = 0;
+  while((m = NOTE_TOKEN_REGEX.exec(text))){
+    html += escapeHtml(text.slice(lastIndex, m.index));
+    if(m[1]){
+      html += `<a href="${escapeHtml(m[1])}" target="_blank" rel="noopener">${escapeHtml(m[1])}</a>`;
+    }else{
+      const value = m[2] || m[3];
+      html += `<span class="note-copy-box">${escapeHtml(value)}<button type="button" class="note-copy-btn" data-copy="${escapeHtml(value)}" title="Скопировать" aria-label="Скопировать">${NOTE_COPY_ICON}</button></span>`;
+    }
+    lastIndex = m.index + m[0].length;
+  }
+  html += escapeHtml(text.slice(lastIndex));
+  return html;
+}
+
+// Ненавязчивый попап "Скопировано" — position:fixed без фона-подложки, клики/скролл сайта не
+// блокирует. Ровно 1.5с на весь показ: 1с полностью видно, последние 0.5с — плавное угасание
+// прозрачности (класс добавляется отдельным тиком, чтобы transition успел подхватить смену).
+function showCopiedToast(){
+  const el = document.createElement("div");
+  el.className = "toast toast-copied";
+  el.textContent = "Скопировано";
+  document.body.appendChild(el);
+  setTimeout(() => {
+    el.classList.add("toast-copied-fade");
+    setTimeout(() => el.remove(), 500);
+  }, 1000);
+}
+
+async function copyNoteValue(value){
+  try{
+    await navigator.clipboard.writeText(value);
+    showCopiedToast();
+  }catch(e){
+    showToast("Не удалось скопировать", true);
+  }
+}
+
 function uid(){
   return (crypto.randomUUID ? crypto.randomUUID() : "id-" + Date.now() + "-" + Math.random().toString(16).slice(2));
 }
@@ -1195,7 +1263,7 @@ function openDetailModal(item){
     <h3>${escapeHtml(item.title)}</h3>
     ${price ? `<div class="card-price" style="font-size:1.15rem;margin-bottom:10px;">${escapeHtml(price)}</div>` : ""}
     ${reservedLine}
-    ${item.note ? `<p class="card-note" style="white-space:pre-wrap;">${escapeHtml(item.note)}</p>` : ""}
+    ${item.note ? `<p class="card-note" style="white-space:pre-wrap;">${renderNoteWithCopyBoxes(item.note)}</p>` : ""}
     ${item.link ? `<div class="card-link" style="margin:10px 0;"><a href="${escapeHtml(item.link)}" target="_blank" rel="noopener">Открыть ссылку →</a></div>` : ""}
     <div class="modal-actions" id="detailActions"></div>
   `, overlay => {
@@ -1205,6 +1273,9 @@ function openDetailModal(item){
         overlay.querySelectorAll(".detail-thumb").forEach(t => t.classList.remove("active"));
         thumb.classList.add("active");
       });
+    });
+    overlay.querySelectorAll(".note-copy-btn").forEach(btn => {
+      btn.addEventListener("click", () => copyNoteValue(btn.dataset.copy));
     });
 
     const actions = overlay.querySelector("#detailActions");
@@ -1550,7 +1621,7 @@ function renderCard(item){
           ? `<a href="${escapeHtml(item.link)}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a>`
           : escapeHtml(item.title)}</p>
         ${price ? `<div class="card-price">${escapeHtml(price)}</div>` : ""}
-        ${item.note ? `<p class="card-note card-note-clamp">${escapeHtml(item.note)}</p>` : ""}
+        ${item.note ? `<p class="card-note card-note-clamp">${linkifyText(item.note)}</p>` : ""}
         <div class="card-footer">
           ${renderCardFooter(item)}
         </div>
