@@ -362,13 +362,10 @@ function litNextTitleLetter(){
   if(titleLetterIndex >= letters.length) return;
   const el = letters[titleLetterIndex];
   const color = TITLE_RAINBOW_COLORS[titleLetterIndex % TITLE_RAINBOW_COLORS.length];
-  // transition — только тут, точечно на конкретной букве, в момент её единственного и
-  // необратимого перехода от "наследует var(--text)" к фиксированному цвету радуги. НЕ через
-  // общее CSS-правило на .title-letter — иначе оно цепляло бы и ещё непогашенные буквы, чей цвет
-  // всё ещё пассивно едет вместе с темой (var(--text) уже анимируется на :root — см. начало
-  // файла), и получился бы тот самый двойной переход.
-  el.style.transition = "color .3s ease, text-shadow .3s ease";
-  el.style.color = color;
+  // Сама буква остаётся обычного цвета текста (var(--text), тема как обычна) — красится только
+  // свечение вокруг неё (text-shadow). Поэтому letter.color тут не трогаем вообще — только
+  // text-shadow, точечно на этой букве, никакого риска двойного перехода (не var-based свойство).
+  el.style.transition = "text-shadow .3s ease";
   el.style.textShadow = `0 0 6px ${color}, 0 0 14px ${color}`;
   titleLetterIndex++;
 }
