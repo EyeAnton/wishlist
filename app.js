@@ -2159,3 +2159,26 @@ export function initApp(opts){
   IS_ADMIN = !!(opts && opts.isAdmin);
   initTheme();
   initSky();
+  initCountdown();
+  initFirebase();
+  renderAll();
+  if(IS_ADMIN){
+    initGoogleSignIn();
+  }else{
+    renderTopContacts();
+    initTitleLetters();
+    startTitleHint();
+    $("#titleClickTarget")?.addEventListener("click", handleTitleClick);
+    $("#infoBtn")?.addEventListener("click", openIntroModal);
+    // openModal() закрывает предыдущий попап, так что оба сразу показать нельзя — в самый
+    // первый визит приоритет у интро (объясняет весь сайт), а тултип нового факта — сразу после
+    // его закрытия (см. maybeShowIntro/introDismissed). У вернувшегося гостя интро не показываем
+    // вообще, поэтому оно ничему не мешает с самого начала.
+    introDismissed = !!localStorage.getItem(LS.introSeen);
+    maybeShowIntro();
+  }
+  watchItems();
+  watchFacts();
+  watchBonusStars();
+  loadRates();
+}
