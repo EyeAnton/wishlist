@@ -387,30 +387,40 @@ function initTitleLetters(){
   el.innerHTML = Array.from(el.textContent).map(ch => `<span class="title-letter">${ch}</span>`).join("");
 }
 
-// Подсказка-приглашение: раз в 10с по заголовку пробегает блик случайного цвета слева направо —
-// чтобы гость вообще понял, что на "Вишлист" можно (и стоит) кликать. Останавливается насовсем
-// при первом же клике (см. handleTitleClick) — дальше пасхалка уже "открыта", подсказка не нужна.
-let titleShineTimer = null;
+// Подсказка-приглашение: через 3с после открытия страницы, и затем каждые 5с, заголовок дважды
+// пульсирует подсветкой (сразу все 7 букв, будто клики уже сделаны) — чтобы гость понял, что на
+// "Вишлист" можно (и стоит) кликать. Останавливается насовсем при первом же клике (см.
+// handleTitleClick) — дальше пасхалка уже "открыта", подсказка не нужна. Буква сама остаётся
+// обычного цвета текста — пульсирует только свечение (text-shadow), тот же принцип, что и у
+// litNextTitleLetter.
+let titleHintTimer = null;
 
-function spawnTitleShine(){
-  const btn = $("#titleClickTarget");
-  if(!btn) return;
-  const hue = Math.floor(Math.random() * 360);
-  const shine = document.createElement("span");
-  shine.className = "title-shine";
-  shine.style.setProperty("--shine-color", `hsl(${hue},100%,75%)`);
-  shine.addEventListener("animationend", () => shine.remove());
-  btn.appendChild(shine);
+function pulseTitleHint(){
+  const letters = document.querySelectorAll("#titleText .title-letter");
+  letters.forEach((el, i) => {
+    const color = TITLE_RAINBOW_COLORS[i % TITLE_RAINBOW_COLORS.length];
+    el.style.setProperty("--hint-color", color);
+    el.classList.add("title-hint-pulse");
+  });
+  setTimeout(() => {
+    letters.forEach(el => el.classList.remove("title-hint-pulse"));
+  }, 600);
 }
 
-function startTitleShineHint(){
+function startTitleHint(){
   if(window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  titleShineTimer = setInterval(spawnTitleShine, 10000);
+  titleHintTimer = setTimeout(() => {
+    pulseTitleHint();
+    titleHintTimer = setInterval(pulseTitleHint, 5000);
+  }, 3000);
 }
 
-function stopTitleShineHint(){
-  clearInterval(titleShineTimer);
-  titleShineTimer = null;
+function stopTitleHint(){
+  // titleHintTimer держит то ID setTimeout (до первой пульсации), то ID setInterval (после) —
+  // clearTimeout/clearInterval взаимозаменяемы в браузере (общее пространство ID), одного вызова
+  // достаточно на оба случая.
+  clearTimeout(titleHintTimer);
+  titleHintTimer = null;
 }
 
 function litNextTitleLetter(){
@@ -472,7 +482,7 @@ function exitStarSpecialMode(){
 
 function handleTitleClick(){
   if(titleEasterEggLocked) return;
-  stopTitleShineHint();
+  stopTitleHint();
   litNextTitleLetter();
   if(titleLetterIndex >= TITLE_RAINBOW_COLORS.length){
     // Необратимо: назад к titleLetterIndex=0 сознательно не откатываем, даже если погасят
@@ -2223,7 +2233,7 @@ export function initApp(opts){
   }else{
     renderTopContacts();
     initTitleLetters();
-    startTitleShineHint();
+    startTitleHint();
     $("#titleClickTarget")?.addEventListener("click", handleTitleClick);
     $("#infoBtn")?.addEventListener("click", openIntroModal);
     // openModal() закрывает предыдущий попап, так что оба сразу показать нельзя — в самый
