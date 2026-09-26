@@ -250,6 +250,36 @@ function initSky(){
     frag.appendChild(star);
   }
   container.appendChild(frag);
+  applyMoonPhase();
+}
+
+// Реальная фаза Луны на сегодня (не декоративная константа) — синодический месяц и опорное
+// новолуние (6 января 2000, 18:14 UTC) достаточно точны для декоративной иконки на сайте;
+// пересчитывать чаще раза за визит незачем, фаза меняется медленно. phase: 0 — новолуние,
+// 0.5 — полнолуние, 1 — снова новолуние.
+function getMoonPhase(date){
+  const SYNODIC_MONTH_DAYS = 29.53058867;
+  const KNOWN_NEW_MOON_UTC = Date.UTC(2000, 0, 6, 18, 14, 0);
+  const diffDays = (date.getTime() - KNOWN_NEW_MOON_UTC) / 86400000;
+  let phase = (diffDays % SYNODIC_MONTH_DAYS) / SYNODIC_MONTH_DAYS;
+  if(phase < 0) phase += 1;
+  return phase;
+}
+
+// Двигает тень (.sky-moon-shadow) по горизонтали через --moon-shadow-left (см. style.css):
+// 0px — тень ровно на луне (новолуние, ничего не освещено), ±52px (диаметр) — тень полностью в
+// стороне (полнолуние). Знак — растущая луна (тень уходит влево, освещённая часть справа) или
+// убывающая (тень заходит справа, освещённая часть слева) — стандартное представление для
+// северного полушария.
+function applyMoonPhase(){
+  const shadow = $(".sky-moon-shadow");
+  if(!shadow) return;
+  const phase = getMoonPhase(new Date());
+  const illumination = (1 - Math.cos(phase * 2 * Math.PI)) / 2;
+  const diameter = 52;
+  const sign = phase <= 0.5 ? -1 : 1;
+  const offsetPx = sign * illumination * diameter;
+  shadow.style.setProperty("--moon-shadow-left", `${offsetPx.toFixed(1)}px`);
 }
 
 // ====== ПАДАЮЩАЯ ЗВЕЗДА ======
@@ -357,6 +387,32 @@ function initTitleLetters(){
   el.innerHTML = Array.from(el.textContent).map(ch => `<span class="title-letter">${ch}</span>`).join("");
 }
 
+// Подсказка-приглашение: раз в 10с по заголовку пробегает блик случайного цвета слева направо —
+// чтобы гость вообще понял, что на "Вишлист" можно (и стоит) кликать. Останавливается насовсем
+// при первом же клике (см. handleTitleClick) — дальше пасхалка уже "открыта", подсказка не нужна.
+let titleShineTimer = null;
+
+function spawnTitleShine(){
+  const btn = $("#titleClickTarget");
+  if(!btn) return;
+  const hue = Math.floor(Math.random() * 360);
+  const shine = document.createElement("span");
+  shine.className = "title-shine";
+  shine.style.setProperty("--shine-color", `hsl(${hue},100%,75%)`);
+  shine.addEventListener("animationend", () => shine.remove());
+  btn.appendChild(shine);
+}
+
+function startTitleShineHint(){
+  if(window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  titleShineTimer = setInterval(spawnTitleShine, 10000);
+}
+
+function stopTitleShineHint(){
+  clearInterval(titleShineTimer);
+  titleShineTimer = null;
+}
+
 function litNextTitleLetter(){
   const letters = document.querySelectorAll("#titleText .title-letter");
   if(titleLetterIndex >= letters.length) return;
@@ -416,6 +472,7 @@ function exitStarSpecialMode(){
 
 function handleTitleClick(){
   if(titleEasterEggLocked) return;
+  stopTitleShineHint();
   litNextTitleLetter();
   if(titleLetterIndex >= TITLE_RAINBOW_COLORS.length){
     // Необратимо: назад к titleLetterIndex=0 сознательно не откатываем, даже если погасят
@@ -1150,6 +1207,12 @@ async function fetchLinkPreview(url){
 // ====== МОДАЛЬНЫЕ ОКНА ======
 // closeOnBackdrop только для окон без ввода данных (просмотр карточки) — формы специально
 // не закрываются по клику мимо, иначе случайный клик стирает то, что уже успели набрать.
+// activeModalOnClose — опциональный колбэк текущего попапа (см. opts.onClose), нужен для сценариев
+// вроде "после закрытия интро на первом визите — показать тултип нового факта" (см. maybeShowIntro):
+// closeModal() вызывается отовсюду одинаково (кнопка, клик по фону, замена другим попапом), и без
+// единого хука пришлось бы дублировать эту логику в каждом обработчике закрытия по отдельности.
+let activeModalOnClose = null;
+
 function openModal(html, onMount, opts){
   closeModal();
   const overlay = document.createElement("div");
@@ -1159,12 +1222,18 @@ function openModal(html, onMount, opts){
   if(opts && opts.closeOnBackdrop){
     overlay.addEventListener("click", e => { if(e.target === overlay) closeModal(); });
   }
+  activeModalOnClose = (opts && opts.onClose) || null;
   document.getElementById("modalRoot").appendChild(overlay);
   if(onMount) onMount(overlay);
 }
 function closeModal(){
   const m = document.getElementById("activeModal");
   if(m) m.remove();
+  if(activeModalOnClose){
+    const cb = activeModalOnClose;
+    activeModalOnClose = null;
+    cb();
+  }
 }
 
 // ====== ВХОД ВЛАДЕЛЬЦА ЧЕРЕЗ GOOGLE (Firebase Auth, как в leritonmap) ======
@@ -1932,7 +2001,7 @@ function renderTopContacts(){
 // Попап-объяснение для гостей: что это за список, как бронировать и отменять бронь,
 // куда писать с вопросами. Показывается сам при первом визите (см. maybeShowIntro),
 // плюс доступен в любой момент по кнопке ℹ️ в шапке.
-function openIntroModal(){
+function openIntroModal(opts){
   // Лера слева, Антон справа в этом попапе — порядок только для этих двух кнопок,
   // глобальный CONFIG.CONTACTS (шапка, карточки) не трогаем.
   const popupContacts = [...CONFIG.CONTACTS].reverse();
@@ -1953,13 +2022,17 @@ function openIntroModal(){
     </div>
   `, overlay => {
     overlay.querySelector("#introCloseBtn").addEventListener("click", closeModal);
-  }, { closeOnBackdrop: true });
+  }, { closeOnBackdrop: true, onClose: opts && opts.onClose });
 }
 
 function maybeShowIntro(){
   if(IS_ADMIN) return;
   if(localStorage.getItem(LS.introSeen)) return;
-  openIntroModal();
+  // onClose — только для этого, первого показа: как только окно интро реально закрыто (кнопкой
+  // или кликом по фону), интро больше не мешает, и можно проверить тултип нового факта (см.
+  // maybeRunDailyFactAutoCheck — второе условие, готовность самих фактов, могло наступить и
+  // раньше, и позже этого момента, порядок не важен).
+  openIntroModal({ onClose: () => { introDismissed = true; maybeRunDailyFactAutoCheck(); } });
   localStorage.setItem(LS.introSeen, "1");
 }
 
@@ -2079,15 +2152,23 @@ function watchItems(){
 // Живая подписка на факты дня — хранятся в Firebase как HTML (см. openFactEditModal),
 // редактируются владельцем прямо на сайте. Пока не подгрузились (или их там ещё нет) —
 // используем захардкоженный DEFAULT_DAILY_FACTS.
-let introAlreadySeenAtStart = false;
+// Тултип нового факта показываем только когда ОБА условия выполнены: интро закрыто (не висит
+// поверх — см. openModal/closeModal) и факты из Firebase так или иначе подгрузились (успех,
+// ошибка или база вообще недоступна — лишь бы не мигнуть устаревшим захардкоженным текстом, пока
+// идёт настоящий запрос). introDismissed — это НЕ "интро уже видели раньше", а "интро сейчас не
+// мешает": true либо сразу (уже видели раньше), либо после того как только что закрыли (см.
+// maybeShowIntro) — на первом визите это и даёт число, которого раньше не хватало.
+let introDismissed = false;
+let factsReady = false;
 let dailyFactAutoCheckDone = false;
 function maybeRunDailyFactAutoCheck(){
   if(IS_ADMIN || dailyFactAutoCheckDone) return;
+  if(!introDismissed || !factsReady) return;
   dailyFactAutoCheckDone = true;
-  if(introAlreadySeenAtStart) maybeShowDailyFact();
+  maybeShowDailyFact();
 }
 function watchFacts(){
-  if(!db){ maybeRunDailyFactAutoCheck(); return; }
+  if(!db){ factsReady = true; maybeRunDailyFactAutoCheck(); return; }
   onValue(ref(db, "facts"), snap => {
     const val = snap.val() || {};
     const fromDb = {};
@@ -2097,8 +2178,10 @@ function watchFacts(){
     });
     DAILY_FACTS = { ...DEFAULT_DAILY_FACTS, ...fromDb };
     renderCountdown();
+    factsReady = true;
     maybeRunDailyFactAutoCheck();
   }, () => {
+    factsReady = true;
     maybeRunDailyFactAutoCheck();
   });
 }
@@ -2140,13 +2223,14 @@ export function initApp(opts){
   }else{
     renderTopContacts();
     initTitleLetters();
+    startTitleShineHint();
     $("#titleClickTarget")?.addEventListener("click", handleTitleClick);
     $("#infoBtn")?.addEventListener("click", openIntroModal);
     // openModal() закрывает предыдущий попап, так что оба сразу показать нельзя — в самый
-    // первый визит приоритет у интро (объясняет весь сайт). Факт дня показываем только после
-    // того, как подгрузятся актуальные факты из Firebase (см. watchFacts) — иначе можно на миг
-    // показать устаревший захардкоженный текст, если владелец его уже поправил в админке.
-    introAlreadySeenAtStart = !!localStorage.getItem(LS.introSeen);
+    // первый визит приоритет у интро (объясняет весь сайт), а тултип нового факта — сразу после
+    // его закрытия (см. maybeShowIntro/introDismissed). У вернувшегося гостя интро не показываем
+    // вообще, поэтому оно ничему не мешает с самого начала.
+    introDismissed = !!localStorage.getItem(LS.introSeen);
     maybeShowIntro();
   }
   watchItems();
