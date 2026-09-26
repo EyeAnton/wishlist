@@ -524,7 +524,7 @@ function openStarNamePopup(key, data, starEl){
     <div class="star-name-popup">
       <p>Вы только что зажгли звезду, она будет светить всем!<br>Как вы назовёте эту звезду?</p>
       <div class="star-name-input-wrap">
-        <input type="text" id="starNameInput" placeholder="${escapeHtml(suggested)}">
+        <input type="text" id="starNameInput" value="${escapeHtml(suggested)}" placeholder="(впишите имя звезды)">
         <button type="button" id="starNameSaveBtn" aria-label="Назвать" title="Назвать">${STAR_NAME_CONFIRM_ICON}</button>
       </div>
       <button type="button" id="starExtinguishBtn" class="star-extinguish-link">Погасить звезду</button>
@@ -557,6 +557,8 @@ function openStarNamePopup(key, data, starEl){
   const nameInput = overlay.querySelector("#starNameInput");
   const confirmBtn = overlay.querySelector("#starNameSaveBtn");
   nameInput.focus();
+  nameInput.select(); // новое имя сразу заменяет предложенное
+  confirmBtn.classList.add("is-filled"); // в поле уже есть предложенное имя
   // Галочка "пустая" (см. .star-name-input-wrap button в style.css), пока в поле ничего не
   // введено — заполняется цветом только когда там реально есть текст, как кнопка отправки в
   // мессенджерах.
@@ -569,7 +571,11 @@ function openStarNamePopup(key, data, starEl){
     exitStarSpecialMode();
   }
   function confirmName(){
-    const val = overlay.querySelector("#starNameInput").value.trim() || suggested;
+    const val = nameInput.value.trim();
+    if(!val){
+      nameInput.focus(); // пусто — не сохраняем, виден плейсхолдер "(впишите имя звезды)"
+      return;
+    }
     data.name = val;
     // Расходящийся круг — теперь именно тут, в момент называния, а не при появлении самой точки
     // (см. addBonusStar).
@@ -2153,26 +2159,3 @@ export function initApp(opts){
   IS_ADMIN = !!(opts && opts.isAdmin);
   initTheme();
   initSky();
-  initCountdown();
-  initFirebase();
-  renderAll();
-  if(IS_ADMIN){
-    initGoogleSignIn();
-  }else{
-    renderTopContacts();
-    initTitleLetters();
-    startTitleHint();
-    $("#titleClickTarget")?.addEventListener("click", handleTitleClick);
-    $("#infoBtn")?.addEventListener("click", openIntroModal);
-    // openModal() закрывает предыдущий попап, так что оба сразу показать нельзя — в самый
-    // первый визит приоритет у интро (объясняет весь сайт), а тултип нового факта — сразу после
-    // его закрытия (см. maybeShowIntro/introDismissed). У вернувшегося гостя интро не показываем
-    // вообще, поэтому оно ничему не мешает с самого начала.
-    introDismissed = !!localStorage.getItem(LS.introSeen);
-    maybeShowIntro();
-  }
-  watchItems();
-  watchFacts();
-  watchBonusStars();
-  loadRates();
-}
