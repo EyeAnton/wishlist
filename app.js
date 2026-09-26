@@ -410,14 +410,12 @@ function spawnTitleStarBurst(){
   setTimeout(addBonusStar, 9 * 200 + 300);
 }
 
-// "Особый режим": с 9-го клика (звездопад + зажигание + попап называния) и до тех пор, пока
-// попап не закрыт (назвали звезду или погасили) — карточки товаров и календарь плавно уходят в
-// прозрачность, чтобы ничего не отвлекало от неба. Заодно на это время показываем подписи уже
-// существующих именованных звёзд (см. .sky-star-name-label в style.css) — это "витрина" только
-// для владельца текущего клика, у остальных гостей просто тихо появляется звезда (см.
-// watchBonusStars) без всего этого режима.
-function enterStarSpecialMode(){
-  document.body.classList.add("star-mode-dim");
+// Подписи уже существующих именованных звёзд (см. .sky-star-name-label в style.css) — временная
+// "витрина", общая для двух разных режимов ниже: особого режима 9-го клика (см.
+// enterStarSpecialMode) и режима "посмотреть свою звезду" после того, как пасхалка уже разыграна
+// (см. toggleStarViewMode). Видна только владельцу текущего клика — у остальных гостей просто
+// тихо появляется звезда (см. watchBonusStars) без подписей.
+function showNamedStarLabels(){
   bonusStarsData.forEach(({ data }) => {
     if(!data.name) return;
     const label = document.createElement("span");
@@ -431,13 +429,47 @@ function enterStarSpecialMode(){
   });
 }
 
-function exitStarSpecialMode(){
-  document.body.classList.remove("star-mode-dim");
+function hideNamedStarLabels(){
   document.querySelectorAll('.sky-star-name-label[data-temp-label="1"]').forEach(el => el.remove());
 }
 
+// "Особый режим": с 9-го клика (звездопад + зажигание + попап называния) и до тех пор, пока
+// попап не закрыт (назвали звезду или погасили) — карточки товаров и календарь плавно уходят в
+// прозрачность, чтобы ничего не отвлекало от неба, плюс подписи звёзд (см. выше).
+function enterStarSpecialMode(){
+  document.body.classList.add("star-mode-dim");
+  showNamedStarLabels();
+}
+
+function exitStarSpecialMode(){
+  document.body.classList.remove("star-mode-dim");
+  hideNamedStarLabels();
+}
+
+// После того как пасхалка уже разыграна (titleEasterEggLocked), заголовок не становится совсем
+// неактивным — по клику включается/выключается режим "посмотреть свою звезду": сам заголовок
+// уходит на 30% непрозрачности ("прозрачный на 70%", но не исчезает целиком — остаётся видимым
+// и кликабельным, чтобы можно было так же кликом выйти), плюс подписи именованных звёзд (без
+// затемнения карточек — это не тот драматичный особый режим 9-го клика, а спокойный просмотр).
+let starViewModeActive = false;
+
+function toggleStarViewMode(){
+  starViewModeActive = !starViewModeActive;
+  const btn = $("#titleClickTarget");
+  if(starViewModeActive){
+    if(btn) btn.style.opacity = "0.3";
+    showNamedStarLabels();
+  }else{
+    if(btn) btn.style.opacity = "";
+    hideNamedStarLabels();
+  }
+}
+
 function handleTitleClick(){
-  if(titleEasterEggLocked) return;
+  if(titleEasterEggLocked){
+    toggleStarViewMode();
+    return;
+  }
   stopTitleHint();
   litNextTitleLetter();
   if(titleLetterIndex >= TITLE_RAINBOW_COLORS.length){

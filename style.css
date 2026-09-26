@@ -339,6 +339,9 @@ header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; g
   display:flex; align-items:center; gap:10px; color:inherit; text-decoration:none;
   appearance:none; background:none; border:none; padding:0; margin:0; font:inherit; cursor:pointer;
   outline:none; -webkit-tap-highlight-color:transparent;
+  /* Плавный переход именно тут — под toggleStarViewMode() в app.js (JS-переключаемое состояние,
+     не связано с темой/var()), так что никакого риска двойного перехода. */
+  transition:opacity .25s ease;
 }
 /* Подсказка-приглашение (см. pulseTitleHint/startTitleHint в app.js) — через 3с после открытия
    страницы, и затем каждые 5с, все 7 букв разом дважды пульсируют радужным свечением (превью того,
