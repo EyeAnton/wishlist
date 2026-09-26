@@ -289,8 +289,12 @@ body.star-mode-dim #main, body.star-mode-dim #countdown{opacity:0; pointer-event
   width:52px; height:52px; border-radius:50%; overflow:hidden;
   background:#f4ecd8; box-shadow:0 0 30px 4px rgba(244,236,216,.25);
 }
+/* Положение тени по горизонтали — не константа, а реальная лунная фаза на сегодня (см.
+   applyMoonPhase в app.js): --moon-shadow-left двигает тень от 0 (тень ровно на луне — новолуние)
+   до ±52px (тень полностью в стороне — полнолуние), знак определяет растущая фаза или убывающая. */
 .sky-moon-shadow{
-  position:absolute; top:-8px; left:-18px; width:52px; height:52px; border-radius:50%; background:var(--bg2);
+  position:absolute; top:0; left:var(--moon-shadow-left, 0px);
+  width:52px; height:52px; border-radius:50%; background:var(--bg2);
 }
 
 /* Падающая звезда: голова (точка со свечением) + хвост, летит по случайному диагональному углу
@@ -334,7 +338,25 @@ header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; g
 .topbar-title{
   display:flex; align-items:center; gap:10px; color:inherit; text-decoration:none;
   appearance:none; background:none; border:none; padding:0; margin:0; font:inherit; cursor:pointer;
-  outline:none; -webkit-tap-highlight-color:transparent;
+  outline:none; -webkit-tap-highlight-color:transparent; position:relative;
+}
+/* Блик-подсказка (см. spawnTitleShine в app.js) — короткая полоса градиента, пробегающая слева
+   направо раз в 10с, пока гость ни разу не кликнул по заголовку. Без overflow:hidden на самом
+   .topbar-title: это обрезало бы свечение (text-shadow) уже зажжённых радужных букв, которое
+   выходит за пределы их собственного бокса — небольшой выход блика за край при старте/конце
+   анимации приемлем для мягкого градиента. */
+.title-shine{
+  position:absolute; top:0; left:0; height:100%; width:55%;
+  background:linear-gradient(90deg, transparent, var(--shine-color, #fff) 50%, transparent);
+  opacity:.6; mix-blend-mode:screen; pointer-events:none;
+  animation:title-shine-sweep 1.1s ease-in-out forwards;
+}
+@keyframes title-shine-sweep{
+  0%{transform:translateX(-130%);}
+  100%{transform:translateX(230%);}
+}
+@media (prefers-reduced-motion: reduce){
+  .title-shine{display:none;}
 }
 /* Заголовок не должен НИЧЕМ выделяться при клике/тапе — ни рамкой фокуса, ни серой вспышкой тача
    (см. outline/-webkit-tap-highlight-color выше), ни фоном при наведении/нажатии: это <button>,
