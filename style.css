@@ -178,24 +178,54 @@ body.star-mode-dim #main, body.star-mode-dim #countdown{opacity:0; pointer-event
   position:absolute; transform:translate(-50%, 10px); font-size:.7rem; font-weight:600;
   white-space:nowrap; pointer-events:none;
 }
-/* Попап называния звезды — не общий openModal (тот всегда по центру экрана), а свой оверлей,
-   позиционируется рядом со звездой (см. openStarNamePopup в app.js) + пунктирная линия-коннектор
-   к самой звезде, полупрозрачная (30%), цвета звезды. */
+/* Попап называния звезды — не общий openModal (тот всегда по центру экрана), а свой оверлей:
+   всегда по горизонтали в центре, по вертикали — над звездой или под ней, никогда не перекрывая
+   её (см. openStarNamePopup в app.js) + пунктирная линия-коннектор к самой звезде, полупрозрачная
+   (30%), цвета звезды, с бегущим к звезде пунктиром (см. @keyframes ниже). */
 .star-name-overlay{position:fixed; inset:0; z-index:320; pointer-events:none;}
 .star-name-connector{position:absolute; inset:0; width:100%; height:100%;}
-.star-name-connector line{stroke-width:1.5; stroke-dasharray:5 5;}
+.star-name-connector-dash{
+  stroke-width:1.5; stroke-dasharray:5 5; animation:star-name-dash-flow 1s linear infinite;
+}
+/* Отрицательное смещение — пунктир едет в направлении от (x2,y2) [попап] к (x1,y1) [звезда]. */
+@keyframes star-name-dash-flow{
+  0%{stroke-dashoffset:0;}
+  100%{stroke-dashoffset:-20;}
+}
+@media (prefers-reduced-motion: reduce){
+  .star-name-connector-dash{animation:none;}
+}
 .star-name-popup{
   position:fixed; width:260px; max-width:calc(100vw - 32px); pointer-events:auto;
   background:var(--modal-bg); border:1px solid var(--border); border-radius:14px;
   padding:16px; box-shadow:var(--shadow); color:var(--text);
 }
 .star-name-popup p{margin:0 0 10px; font-size:.9rem; line-height:1.4;}
-.star-name-popup input{
-  width:100%; box-sizing:border-box; padding:8px 10px; border-radius:8px; margin-bottom:10px;
+.star-name-input-wrap{position:relative; margin-bottom:10px;}
+.star-name-input-wrap input{
+  width:100%; box-sizing:border-box; padding:8px 36px 8px 10px; border-radius:8px;
   border:1px solid var(--border); background:var(--input-bg); color:var(--text); font:inherit;
 }
-.star-name-popup input::placeholder{color:var(--muted); opacity:.7;}
-.star-name-actions{display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;}
+.star-name-input-wrap input::placeholder{color:var(--muted); opacity:.7;}
+/* Кнопка "назвать" — галочка внутри поля ввода, как кнопка отправки в мессенджерах, а не отдельная
+   подписанная кнопка снаружи. */
+.star-name-input-wrap button{
+  position:absolute; top:50%; right:4px; transform:translateY(-50%);
+  width:26px; height:26px; padding:0; border-radius:50%; border:none;
+  background:var(--accent-solid); color:#fff; display:flex; align-items:center; justify-content:center;
+}
+.star-name-input-wrap button:hover{background:var(--accent-hover);}
+.star-name-input-wrap svg{width:14px; height:14px;}
+/* "Погасить звезду" — просто текстовая ссылка снизу, без прямоугольника кнопки: это редкое,
+   разрушительное действие, не должно визуально спорить с основным сценарием (назвать). */
+.star-extinguish-link{
+  display:block; margin:0 auto 0; background:none; border:none; padding:0;
+  font:inherit; font-size:.78rem; color:var(--muted); text-decoration:underline; cursor:pointer;
+}
+/* Явно переопределяем и на :hover — иначе глобальный button:hover{background:...} (см. выше, у
+   обычных кнопок сайта) специфичнее просто .star-extinguish-link и всё равно перекрасил бы фон,
+   ровно та же ловушка, что была с заголовком-кнопкой. */
+.star-extinguish-link:hover{background:none; color:var(--text);}
 /* Солнце и луна: класс view-transition-name НЕ используем — именованная группа рендерится в
    отдельном "верхнем слое" браузера поверх вообще всего документа, то есть луна оказалась бы НАД
    календарём и карточками. Вместо этого — вращение вокруг общего пивота сильно ниже экрана:
