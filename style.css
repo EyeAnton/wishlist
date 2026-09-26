@@ -147,6 +147,9 @@ body{
 @media (prefers-reduced-motion: reduce){
   .sky-star{animation:none; opacity:.6;}
 }
+/* Звезда-пасхалка (см. addBonusStar в app.js) — не мерцает, как обычные: цвет и непрозрачность
+   у неё уже сами по себе случайные и постоянные, обычный twinkle (0.15↔1) их бы просто перекрыл. */
+.sky-star-bonus{animation:none;}
 /* Солнце и луна: класс view-transition-name НЕ используем — именованная группа рендерится в
    отдельном "верхнем слое" браузера поверх вообще всего документа, то есть луна оказалась бы НАД
    календарём и карточками. Вместо этого — вращение вокруг общего пивота сильно ниже экрана:
@@ -197,24 +200,28 @@ body{
 /* Падающая звезда: голова (точка со свечением) + хвост, летит по случайному диагональному углу
    в верхней трети неба. Тот же слой (z-index:0 внутри .sky-layer, у которого z-index:-1) — под
    календарём/карточками, как и всё небо. См. initShootingStars()/spawnShootingStar() в app.js —
-   раз в 15-30с случайно, и только ночью (иначе звёзд не видно и падающая звезда на светлом небе
-   не имеет смысла). */
+   раз в 5-9с случайно, и только ночью (иначе звёзд не видно и падающая звезда на светлом небе
+   не имеет смысла) — КРОМЕ звёзд от клика по заголовку (см. handleTitleClick), те намеренно
+   игнорируют время суток, это пасхалка, а не астрономия.
+   Цвет (--star-color/--star-glow1/--star-glow2/--star-tail) и длина полёта (--star-dist) —
+   настраиваемые per-instance свойства с фолбэком на обычный белый/230px, чтобы обычные фоновые
+   звёзды остались как были, а цветные из пасхалки задавали их через inline style. */
 .sky-shooting-star{position:absolute; z-index:0; width:0; height:0;}
 .sky-shooting-anim{
-  position:absolute; width:2.5px; height:2.5px; border-radius:50%; background:#fff;
-  box-shadow:0 0 6px 2px rgba(255,255,255,.85), 0 0 12px 4px rgba(255,255,255,.35);
+  position:absolute; width:2.5px; height:2.5px; border-radius:50%; background:var(--star-color, #fff);
+  box-shadow:0 0 6px 2px var(--star-glow1, rgba(255,255,255,.85)), 0 0 12px 4px var(--star-glow2, rgba(255,255,255,.35));
   animation:sky-shoot .9s cubic-bezier(.2,.6,.4,1) forwards;
 }
 .sky-shooting-anim::after{
   content:''; position:absolute; top:50%; right:100%; width:110px; height:1.5px;
-  background:linear-gradient(to left, rgba(255,255,255,.85), transparent);
+  background:linear-gradient(to left, var(--star-tail, rgba(255,255,255,.85)), transparent);
   transform:translateY(-50%);
 }
 @keyframes sky-shoot{
   0%{opacity:0; transform:translateX(0);}
   12%{opacity:1;}
   75%{opacity:1;}
-  100%{opacity:0; transform:translateX(230px);}
+  100%{opacity:0; transform:translateX(var(--star-dist, 230px));}
 }
 #app{max-width:1080px; margin:0 auto; padding:24px 20px 80px; position:relative;}
 header.topbar{
@@ -222,10 +229,16 @@ header.topbar{
   margin-bottom:24px;
 }
 header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; gap:10px; color:var(--text);}
-/* Ссылка-заголовок на гостевой странице: эмодзи и текст — отдельные span'ы (не один текстовый
-   узел), иначе gap на h1 не между чем применять. Тот же отступ 10px, что и до контактов ниже —
-   чтобы "подарок → Вишлист" и "Вишлист → иконка ТГ" были одинаковыми. */
-.topbar-title{display:flex; align-items:center; gap:10px; color:inherit; text-decoration:none;}
+/* Заголовок на гостевой странице — больше не ссылка на админку (владелец заходит туда напрямую
+   по адресу), а маленькая пасхалка: кнопка вместо <a>, поэтому сброс нативных стилей кнопки
+   (appearance/border/padding/font) — иначе выглядела бы как обычная кнопка, а не как заголовок.
+   Эмодзи и текст — отдельные span'ы (не один текстовый узел), иначе gap на h1 не между чем
+   применять. Тот же отступ 10px, что и до контактов ниже — чтобы "подарок → Вишлист" и
+   "Вишлист → иконка ТГ" были одинаковыми. Клик — см. handleTitleClick в app.js. */
+.topbar-title{
+  display:flex; align-items:center; gap:10px; color:inherit; text-decoration:none;
+  appearance:none; background:none; border:none; padding:0; margin:0; font:inherit; cursor:pointer;
+}
 /* width:100% обязателен: без него topbar-row как flex-item внутри header.topbar сжимается
    по контенту и margin-left:auto ниже не имеет свободного места, чтобы прижать тему к краю. */
 .topbar-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap; width:100%;}

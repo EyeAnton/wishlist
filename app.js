@@ -267,12 +267,17 @@ function isNightSky(){
   return parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--night-opacity")) > 0.5;
 }
 
-function spawnShootingStar(){
+// opts позволяет переопределить положение/угол/цвет/длину полёта — используется пасхалкой клика
+// по заголовку (см. handleTitleClick), обычный фоновый звездопад вызывает без аргументов и
+// получает прежнее поведение через дефолты.
+function spawnShootingStar(opts){
+  opts = opts || {};
   const layer = $("#skyShooting");
-  if(!layer || !isNightSky()) return;
-  const topPct = Math.random() * 33;
-  const leftPct = Math.random() * 90;
-  const angle = 20 + Math.random() * 45;
+  if(!layer) return;
+  if(!opts.ignoreNight && !isNightSky()) return;
+  const topPct = opts.top != null ? opts.top : Math.random() * 33;
+  const leftPct = opts.left != null ? opts.left : Math.random() * 90;
+  const angle = opts.angle != null ? opts.angle : 20 + Math.random() * 45;
   const wrap = document.createElement("div");
   wrap.className = "sky-shooting-star";
   wrap.style.top = `${topPct.toFixed(2)}%`;
@@ -280,6 +285,13 @@ function spawnShootingStar(){
   wrap.style.transform = `rotate(${angle.toFixed(1)}deg)`;
   const anim = document.createElement("div");
   anim.className = "sky-shooting-anim";
+  if(opts.hue != null){
+    anim.style.setProperty("--star-color", `hsl(${opts.hue},100%,70%)`);
+    anim.style.setProperty("--star-glow1", `hsla(${opts.hue},100%,70%,.85)`);
+    anim.style.setProperty("--star-glow2", `hsla(${opts.hue},100%,70%,.35)`);
+    anim.style.setProperty("--star-tail", `hsla(${opts.hue},100%,70%,.85)`);
+  }
+  if(opts.dist != null) anim.style.setProperty("--star-dist", `${opts.dist.toFixed(0)}px`);
   anim.addEventListener("animationend", () => wrap.remove());
   wrap.appendChild(anim);
   layer.appendChild(wrap);
@@ -303,6 +315,96 @@ function initShootingStars(){
     setTimeout(() => { spawnShootingStarBurst(); schedule(); }, delaySec * 1000);
   };
   schedule();
+}
+
+// ====== ПАСХАЛКА: КЛИК ПО ЗАГОЛОВКУ ======
+// "Вишлист" в шапке гостевой страницы раньше был ссылкой на admin.html — теперь владелец заходит
+// туда напрямую по адресу, а заголовок стал маленькой пасхалкой (см. #titleClickTarget в
+// index.html). Обычный клик роняет одну звезду — намеренно в любое время суток (ignoreNight),
+// иначе шутка не сработает днём. Каждый 9-й клик — цветной звездопад (см. spawnTitleStarBurst) и
+// новая звезда остаётся в небе навсегда, для всех гостей (см. addBonusStar/watchBonusStars).
+// После 9-го клика 5 секунд клики по заголовку игнорируются, чтобы не заспамить.
+let titleClickCount = 0;
+let titleClickCooldownUntil = 0;
+
+function spawnTitleStarBurst(){
+  for(let i = 0; i < 9; i++){
+    setTimeout(() => {
+      spawnShootingStar({
+        top: Math.random() * 5,
+        left: 35 + Math.random() * 30,
+        angle: Math.random() * 360,
+        dist: 150 + Math.random() * 170,
+        hue: Math.floor(Math.random() * 360),
+        ignoreNight: true,
+      });
+    }, i * 200);
+  }
+  setTimeout(addBonusStar, 9 * 200 + 300);
+}
+
+function handleTitleClick(){
+  const now = Date.now();
+  if(now < titleClickCooldownUntil) return;
+  titleClickCount++;
+  if(titleClickCount >= 9){
+    titleClickCount = 0;
+    titleClickCooldownUntil = now + 5000;
+    spawnTitleStarBurst();
+  }else{
+    spawnShootingStar({ top: Math.random() * 5, left: 40 + Math.random() * 20, angle: 20 + Math.random() * 45, ignoreNight: true });
+  }
+}
+
+// Звезда-пасхалка рисуется в общий #skyStars (мерцающий фон), но без твинкла — см.
+// .sky-star-bonus в style.css. data приходит либо только что сгенерированной (у того, кто
+// добил 9-й клик), либо из Firebase (у всех остальных, см. watchBonusStars) — форма одна и та же.
+function renderBonusStar(data){
+  const layer = $("#skyStars");
+  if(!layer) return;
+  const star = document.createElement("span");
+  star.className = "sky-star sky-star-bonus";
+  const size = (Math.random() * 1.6 + 1.4).toFixed(1);
+  star.style.left = `${data.left}%`;
+  star.style.top = `${data.top}%`;
+  star.style.width = star.style.height = `${size}px`;
+  star.style.background = `hsl(${data.hue},100%,70%)`;
+  star.style.opacity = data.opacity;
+  star.style.boxShadow = `0 0 6px 2px hsla(${data.hue},100%,70%,.55)`;
+  layer.appendChild(star);
+}
+
+// Ключ генерируем сами (не push()) и сразу помечаем как отрисованный — иначе собственный же
+// watchBonusStars(), получив это значение обратно из Firebase, нарисует его второй раз поверх.
+// Требует отдельного правила в Firebase Security Rules на запись в sky/bonusStars — как и
+// stats/viewCount (см. maybeCountView), без правила просто тихо не сохранится: инициатор всё
+// равно видит звезду локально, остальные — только после того, как правило добавят.
+let bonusStarsRendered = new Set();
+
+function addBonusStar(){
+  const key = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const data = {
+    hue: Math.floor(Math.random() * 360),
+    opacity: Number((0.8 + Math.random() * 0.2).toFixed(2)),
+    left: Number((Math.random() * 100).toFixed(2)),
+    top: Number((Math.random() * 70).toFixed(2)),
+  };
+  bonusStarsRendered.add(key);
+  renderBonusStar(data);
+  if(!db) return;
+  set(ref(db, "sky/bonusStars/" + key), data).catch(() => { /* нет доступа — правило ещё не добавлено */ });
+}
+
+function watchBonusStars(){
+  if(!db) return;
+  onValue(ref(db, "sky/bonusStars"), snap => {
+    const val = snap.val() || {};
+    Object.keys(val).forEach(key => {
+      if(bonusStarsRendered.has(key)) return;
+      bonusStarsRendered.add(key);
+      renderBonusStar(val[key]);
+    });
+  }, () => { /* нет доступа (правило ещё не добавлено) — просто не подгружаем чужие звёзды */ });
 }
 
 // ====== СЧЁТЧИК ДО 1 ОКТЯБРЯ ======
@@ -1830,6 +1932,7 @@ export function initApp(opts){
     initGoogleSignIn();
   }else{
     renderTopContacts();
+    $("#titleClickTarget")?.addEventListener("click", handleTitleClick);
     $("#infoBtn")?.addEventListener("click", openIntroModal);
     // openModal() закрывает предыдущий попап, так что оба сразу показать нельзя — в самый
     // первый визит приоритет у интро (объясняет весь сайт). Факт дня показываем только после
@@ -1842,5 +1945,6 @@ export function initApp(opts){
   watchFacts();
   watchViewCount();
   maybeCountView();
+  watchBonusStars();
   loadRates();
 }
