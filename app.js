@@ -454,12 +454,14 @@ function renderBonusStar(data, withRipple){
 let bonusStarsData = new Map();
 
 const STAR_NAME_SUGGESTIONS = ["Вега", "Регул", "Спика", "Ригель", "Альтаир", "Полярная", "Денеб", "Антарес"];
+const STAR_NAME_CONFIRM_ICON = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 10.5 8 14.5 16 5.5"/></svg>`;
 
-// Попап называния — НЕ через общий openModal (тот всегда по центру), а отдельным оверлеем:
-// позиционируется рядом со звездой, с "умной" стороной (если звезда у правого края экрана — попап
-// открывается слева от неё, и наоборот, чтобы весь попап помещался на экране), плюс пунктирная
-// линия-коннектор к звезде. Показывается только инициатору 9-го клика — остальные гости просто
-// видят готовую звезду через watchBonusStars, без этого попапа и без затемнения.
+// Попап называния — НЕ через общий openModal (тот всегда по центру экрана целиком), а отдельным
+// оверлеем: всегда по горизонтали в центре, а по вертикали — над звездой или под ней (если звезда
+// в нижней половине экрана, попап сверху, и наоборот), чтобы никогда не перекрывать саму звезду.
+// Плюс пунктирная линия-коннектор к звезде, бегущая к ней (см. .star-name-connector-dash в
+// style.css). Показывается только инициатору 9-го клика — остальные гости просто видят готовую
+// звезду через watchBonusStars, без этого попапа и без затемнения.
 function openStarNamePopup(key, data, starEl){
   const sx = (data.left / 100) * window.innerWidth;
   const sy = (data.top / 100) * window.innerHeight;
@@ -468,14 +470,14 @@ function openStarNamePopup(key, data, starEl){
   const overlay = document.createElement("div");
   overlay.className = "star-name-overlay";
   overlay.innerHTML = `
-    <svg class="star-name-connector"><line/></svg>
+    <svg class="star-name-connector"><line class="star-name-connector-dash"/></svg>
     <div class="star-name-popup">
-      <p>Вы только что зажгли звезду, она будет светить всем! Как вы назовёте эту звезду?</p>
-      <input type="text" id="starNameInput" placeholder="${escapeHtml(suggested)}">
-      <div class="star-name-actions">
-        <button type="button" class="secondary" id="starExtinguishBtn">Погасить звезду</button>
-        <button type="button" id="starNameSaveBtn">Назвать</button>
+      <p>Вы только что зажгли звезду, она будет светить всем!<br>Как вы назовёте эту звезду?</p>
+      <div class="star-name-input-wrap">
+        <input type="text" id="starNameInput" placeholder="${escapeHtml(suggested)}">
+        <button type="button" id="starNameSaveBtn" aria-label="Назвать" title="Назвать">${STAR_NAME_CONFIRM_ICON}</button>
       </div>
+      <button type="button" id="starExtinguishBtn" class="star-extinguish-link">Погасить звезду</button>
     </div>
   `;
   document.body.appendChild(overlay);
@@ -483,17 +485,21 @@ function openStarNamePopup(key, data, starEl){
   const popup = overlay.querySelector(".star-name-popup");
   const line = overlay.querySelector("line");
   const margin = 16;
+  const gap = 40; // зазор между попапом и самой звездой (плюс её свечение), чтобы не перекрывать
   const popupRect = popup.getBoundingClientRect();
-  const placeLeft = sx > window.innerWidth * 0.6;
-  let popupLeft = placeLeft ? sx - popupRect.width - margin : sx + margin;
+
+  let popupLeft = (window.innerWidth - popupRect.width) / 2;
   popupLeft = Math.max(margin, Math.min(popupLeft, window.innerWidth - popupRect.width - margin));
-  let popupTop = sy - popupRect.height / 2;
+
+  const starInBottomHalf = sy > window.innerHeight / 2;
+  let popupTop = starInBottomHalf ? sy - gap - popupRect.height : sy + gap;
   popupTop = Math.max(margin, Math.min(popupTop, window.innerHeight - popupRect.height - margin));
+
   popup.style.left = `${popupLeft}px`;
   popup.style.top = `${popupTop}px`;
 
-  const px = placeLeft ? popupLeft + popupRect.width : popupLeft;
-  const py = popupTop + popupRect.height / 2;
+  const px = popupLeft + popupRect.width / 2;
+  const py = starInBottomHalf ? popupTop + popupRect.height : popupTop;
   line.setAttribute("x1", sx); line.setAttribute("y1", sy);
   line.setAttribute("x2", px); line.setAttribute("y2", py);
   line.setAttribute("stroke", `hsla(${data.hue},100%,70%,.3)`);
@@ -504,11 +510,18 @@ function openStarNamePopup(key, data, starEl){
     overlay.remove();
     exitStarSpecialMode();
   }
-  overlay.querySelector("#starNameSaveBtn").addEventListener("click", () => {
+  function confirmName(){
     const val = overlay.querySelector("#starNameInput").value.trim() || suggested;
     data.name = val;
+    // Расходящийся круг — теперь именно тут, в момент называния, а не при появлении самой точки
+    // (см. addBonusStar).
+    spawnStarRipple(data);
     if(db) update(ref(db, "sky/bonusStars/" + key), { name: val }).catch(() => { /* нет доступа — правило ещё не добавлено */ });
     closeOverlay();
+  }
+  overlay.querySelector("#starNameSaveBtn").addEventListener("click", confirmName);
+  overlay.querySelector("#starNameInput").addEventListener("keydown", e => {
+    if(e.key === "Enter") confirmName();
   });
   overlay.querySelector("#starExtinguishBtn").addEventListener("click", () => {
     bonusStarsData.delete(key);
@@ -527,7 +540,9 @@ function addBonusStar(){
     top: Number((Math.random() * 70).toFixed(2)),
     name: null,
   };
-  const starEl = renderBonusStar(data, true);
+  // Без ripple тут — расходящийся круг теперь играет ПОСЛЕ того, как звезду назвали (см.
+  // openStarNamePopup), а не в момент появления самой точки.
+  const starEl = renderBonusStar(data, false);
   bonusStarsData.set(key, { data, starEl });
   openStarNamePopup(key, data, starEl);
   if(!db) return;
