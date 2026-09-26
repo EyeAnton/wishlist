@@ -338,25 +338,19 @@ header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; g
 .topbar-title{
   display:flex; align-items:center; gap:10px; color:inherit; text-decoration:none;
   appearance:none; background:none; border:none; padding:0; margin:0; font:inherit; cursor:pointer;
-  outline:none; -webkit-tap-highlight-color:transparent; position:relative;
+  outline:none; -webkit-tap-highlight-color:transparent;
 }
-/* Блик-подсказка (см. spawnTitleShine в app.js) — короткая полоса градиента, пробегающая слева
-   направо раз в 10с, пока гость ни разу не кликнул по заголовку. Без overflow:hidden на самом
-   .topbar-title: это обрезало бы свечение (text-shadow) уже зажжённых радужных букв, которое
-   выходит за пределы их собственного бокса — небольшой выход блика за край при старте/конце
-   анимации приемлем для мягкого градиента. */
-.title-shine{
-  position:absolute; top:0; left:0; height:100%; width:55%;
-  background:linear-gradient(90deg, transparent, var(--shine-color, #fff) 50%, transparent);
-  opacity:.6; mix-blend-mode:screen; pointer-events:none;
-  animation:title-shine-sweep 1.1s ease-in-out forwards;
-}
-@keyframes title-shine-sweep{
-  0%{transform:translateX(-130%);}
-  100%{transform:translateX(230%);}
+/* Подсказка-приглашение (см. pulseTitleHint/startTitleHint в app.js) — через 3с после открытия
+   страницы, и затем каждые 5с, все 7 букв разом дважды пульсируют радужным свечением (превью того,
+   что будет, если довести клики до конца), пока гость ни разу не кликнул. Буква сама остаётся
+   обычного цвета текста — как и у зажжённых по-настоящему букв, меняется только text-shadow. */
+.title-letter.title-hint-pulse{animation:title-hint-pulse .25s ease-in-out 2;}
+@keyframes title-hint-pulse{
+  0%, 100%{text-shadow:none;}
+  50%{text-shadow:0 0 6px var(--hint-color, #fff), 0 0 14px var(--hint-color, #fff);}
 }
 @media (prefers-reduced-motion: reduce){
-  .title-shine{display:none;}
+  .title-letter.title-hint-pulse{animation:none;}
 }
 /* Заголовок не должен НИЧЕМ выделяться при клике/тапе — ни рамкой фокуса, ни серой вспышкой тача
    (см. outline/-webkit-tap-highlight-color выше), ни фоном при наведении/нажатии: это <button>,
