@@ -258,7 +258,9 @@ header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; g
   text-align:center; padding:3px 0; text-transform:uppercase;
 }
 .calendar-cell-day{color:var(--text); font-size:1.05rem; font-weight:700; text-align:center; padding:6px 0 7px;}
-.calendar-cell-target{box-shadow:0 0 0 2px var(--accent-solid), var(--shadow);}
+/* Оранжевая обводка — у СЕГОДНЯШНЕЙ клетки ("где мы сейчас"), не у 1 октября: раньше была
+   наоборот, но это далёкая будущая дата, а не текущая точка отсчёта. */
+.calendar-cell-today{box-shadow:0 0 0 2px var(--accent-solid), var(--shadow);}
 .calendar-cell-target .calendar-cell-dow{background:var(--accent-hover);}
 .calendar-cell-target .calendar-cell-day{font-size:1.2rem; position:relative;}
 /* Цифра дня остаётся читаемой (иначе неясно, что это именно 1 октября), а эмодзи-салют
@@ -268,10 +270,11 @@ header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; g
   font-size:1.5em; opacity:.35; pointer-events:none;
 }
 .calendar-cell-daynum{position:relative; z-index:1;}
-/* Прошедшие дни (включая сегодняшний — его факт уже открыт) выглядят слегка оторванными:
-   наклон + лёгкое затемнение. Кликабельны те, для которых есть факт про Антона — а для
-   владельца (редактирование фактов) кликабельны вообще все клетки, не только прошедшие. */
-.calendar-cell-past{transform:rotate(-6deg); opacity:.72; transition:opacity .15s;}
+/* Прошедшие дни (и сегодняшний, если его факт уже открыт — см. renderCountdown в app.js)
+   выглядят слегка оторванными: наклон + затемнение, которое приходит per-cell через
+   --cell-opacity (чем старше день, тем меньше). Кликабельны те, для которых есть факт про
+   Антона — а для владельца (редактирование фактов) кликабельны вообще все клетки. */
+.calendar-cell-past{transform:rotate(-6deg); opacity:var(--cell-opacity, .72); transition:opacity .15s;}
 .calendar-cell[data-fact-date]{cursor:pointer; transition:opacity .15s;}
 .calendar-cell[data-fact-date]:hover{opacity:.8;}
 .calendar-cell-past[data-fact-date]:hover{opacity:1;}
