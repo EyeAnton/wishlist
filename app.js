@@ -308,13 +308,29 @@ function spawnShootingStarBurst(){
   }
 }
 
+// Таймер фонового звездопада — хранится, чтобы его можно было сбросить и начать 5-9с отсчёт
+// заново (см. resetAmbientShootingStarTimer, вызывается из handleTitleClick): без этого клик по
+// заголовку иногда совпадал с уже запланированным фоновым срабатыванием, и с неба падали две
+// звезды одновременно вместо одной от клика.
+let ambientShootingStarsEnabled = false;
+let ambientShootingStarTimer = null;
+
+function scheduleAmbientShootingStar(){
+  if(!ambientShootingStarsEnabled) return;
+  const delaySec = 5 + Math.random() * 4;
+  ambientShootingStarTimer = setTimeout(() => { spawnShootingStarBurst(); scheduleAmbientShootingStar(); }, delaySec * 1000);
+}
+
+function resetAmbientShootingStarTimer(){
+  if(!ambientShootingStarsEnabled) return;
+  clearTimeout(ambientShootingStarTimer);
+  scheduleAmbientShootingStar();
+}
+
 function initShootingStars(){
   if(window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  const schedule = () => {
-    const delaySec = 5 + Math.random() * 4;
-    setTimeout(() => { spawnShootingStarBurst(); schedule(); }, delaySec * 1000);
-  };
-  schedule();
+  ambientShootingStarsEnabled = true;
+  scheduleAmbientShootingStar();
 }
 
 // ====== ПАСХАЛКА: КЛИК ПО ЗАГОЛОВКУ ======
@@ -333,7 +349,9 @@ function spawnTitleStarBurst(){
       spawnShootingStar({
         top: Math.random() * 5,
         left: 35 + Math.random() * 30,
-        angle: Math.random() * 360,
+        // 15-165° — вниз-вправо через строго вниз до вниз-влево, никогда вверх (0°/180° —
+        // строго вбок, тоже исключены с запасом).
+        angle: 15 + Math.random() * 150,
         dist: 150 + Math.random() * 170,
         hue: Math.floor(Math.random() * 360),
         ignoreNight: true,
@@ -354,6 +372,9 @@ function handleTitleClick(){
   }else{
     spawnShootingStar({ top: Math.random() * 5, left: 40 + Math.random() * 20, angle: 20 + Math.random() * 45, ignoreNight: true });
   }
+  // Клик уронил звезду прямо сейчас — сдвигаем следующий фоновый звездопад на новые 5-9с,
+  // иначе он может выстрелить почти тут же следом и создать впечатление, что упало сразу две.
+  resetAmbientShootingStarTimer();
 }
 
 // Звезда-пасхалка рисуется в общий #skyStars (мерцающий фон), но без твинкла — см.
