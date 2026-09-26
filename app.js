@@ -377,10 +377,28 @@ function handleTitleClick(){
   resetAmbientShootingStarTimer();
 }
 
+// Расходящаяся окружность того же цвета в момент зажигания звезды — растёт от точки до
+// половины экрана по радиусу (100vmax в диаметре) и одновременно теряет непрозрачность,
+// исчезая полностью к концу. Только для ЗАЖИГАНИЯ, не для самой звезды — см. вызовы ниже.
+function spawnStarRipple(data){
+  const layer = $("#skyStars");
+  if(!layer) return;
+  const ripple = document.createElement("span");
+  ripple.className = "sky-star-ripple";
+  ripple.style.left = `${data.left}%`;
+  ripple.style.top = `${data.top}%`;
+  ripple.style.setProperty("--ripple-color", `hsl(${data.hue},100%,70%)`);
+  ripple.addEventListener("animationend", () => ripple.remove());
+  layer.appendChild(ripple);
+}
+
 // Звезда-пасхалка рисуется в общий #skyStars (мерцающий фон), но без твинкла — см.
 // .sky-star-bonus в style.css. data приходит либо только что сгенерированной (у того, кто
 // добил 9-й клик), либо из Firebase (у всех остальных, см. watchBonusStars) — форма одна и та же.
-function renderBonusStar(data){
+// withRipple — только для по-настоящему НОВОГО зажигания (см. вызовы), не для загрузки уже
+// существующих звёзд при открытии страницы (иначе на каждый заход вспыхивало бы разом столько
+// окружностей, сколько звёзд уже накопилось).
+function renderBonusStar(data, withRipple){
   const layer = $("#skyStars");
   if(!layer) return;
   const star = document.createElement("span");
@@ -393,6 +411,7 @@ function renderBonusStar(data){
   star.style.opacity = data.opacity;
   star.style.boxShadow = `0 0 6px 2px hsla(${data.hue},100%,70%,.55)`;
   layer.appendChild(star);
+  if(withRipple) spawnStarRipple(data);
 }
 
 // Ключ генерируем сами (не push()) и сразу помечаем как отрисованный — иначе собственный же
@@ -411,20 +430,28 @@ function addBonusStar(){
     top: Number((Math.random() * 70).toFixed(2)),
   };
   bonusStarsRendered.add(key);
-  renderBonusStar(data);
+  renderBonusStar(data, true);
   if(!db) return;
   set(ref(db, "sky/bonusStars/" + key), data).catch(() => { /* нет доступа — правило ещё не добавлено */ });
 }
+
+// Первый снапшот onValue отдаёт ВСЕ уже существующие звёзды разом — их рисуем тихо, без ripple
+// (иначе при каждом заходе на сайт вспыхивало бы столько окружностей, сколько звёзд накопилось
+// за всё время). Ripple — только для действительно новых ключей, появившихся ПОСЛЕ первого
+// снапшота (то есть кто-то ещё, в реальном времени, только что добил свой 9-й клик).
+let bonusStarsInitialLoadDone = false;
 
 function watchBonusStars(){
   if(!db) return;
   onValue(ref(db, "sky/bonusStars"), snap => {
     const val = snap.val() || {};
+    const isLiveUpdate = bonusStarsInitialLoadDone;
     Object.keys(val).forEach(key => {
       if(bonusStarsRendered.has(key)) return;
       bonusStarsRendered.add(key);
-      renderBonusStar(val[key]);
+      renderBonusStar(val[key], isLiveUpdate);
     });
+    bonusStarsInitialLoadDone = true;
   }, () => { /* нет доступа (правило ещё не добавлено) — просто не подгружаем чужие звёзды */ });
 }
 

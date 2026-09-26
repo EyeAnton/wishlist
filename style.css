@@ -150,6 +150,23 @@ body{
 /* Звезда-пасхалка (см. addBonusStar в app.js) — не мерцает, как обычные: цвет и непрозрачность
    у неё уже сами по себе случайные и постоянные, обычный twinkle (0.15↔1) их бы просто перекрыл. */
 .sky-star-bonus{animation:none;}
+/* Расходящаяся окружность в момент зажигания новой звезды (см. spawnStarRipple в app.js) — растёт
+   от точки до 100vmax в диаметре (то есть до половины экрана по радиусу, если считать по большей
+   стороне) и одновременно гаснет до полной прозрачности. pointer-events:none — это просто
+   декорация поверх неба, не должна мешать кликам под ней. */
+.sky-star-ripple{
+  position:absolute; border-radius:50%; pointer-events:none;
+  background:radial-gradient(circle, var(--ripple-color, #fff) 0%, transparent 70%);
+  transform:translate(-50%, -50%);
+  animation:sky-star-ripple 1.8s ease-out forwards;
+}
+@keyframes sky-star-ripple{
+  0%{width:4px; height:4px; opacity:.9;}
+  100%{width:100vmax; height:100vmax; opacity:0;}
+}
+@media (prefers-reduced-motion: reduce){
+  .sky-star-ripple{display:none;}
+}
 /* Солнце и луна: класс view-transition-name НЕ используем — именованная группа рендерится в
    отдельном "верхнем слое" браузера поверх вообще всего документа, то есть луна оказалась бы НАД
    календарём и карточками. Вместо этого — вращение вокруг общего пивота сильно ниже экрана:
