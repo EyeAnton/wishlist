@@ -167,6 +167,35 @@ body{
 @media (prefers-reduced-motion: reduce){
   .sky-star-ripple{display:none;}
 }
+/* "Особый режим" 9-го клика (см. enterStarSpecialMode в app.js) — карточки и календарь плавно
+   уходят в прозрачность, пока открыт попап называния звезды; transition — на базовых правилах
+   (не только под .star-mode-dim), иначе не сыграет обратно при выходе из режима. */
+#main, #countdown{transition:opacity .5s ease;}
+body.star-mode-dim #main, body.star-mode-dim #countdown{opacity:0; pointer-events:none;}
+/* Подпись названной звезды — только во время "особого режима" (temp-элементы, см.
+   enterStarSpecialMode/exitStarSpecialMode), маленьким текстом цвета звезды прямо под ней. */
+.sky-star-name-label{
+  position:absolute; transform:translate(-50%, 10px); font-size:.7rem; font-weight:600;
+  white-space:nowrap; pointer-events:none;
+}
+/* Попап называния звезды — не общий openModal (тот всегда по центру экрана), а свой оверлей,
+   позиционируется рядом со звездой (см. openStarNamePopup в app.js) + пунктирная линия-коннектор
+   к самой звезде, полупрозрачная (30%), цвета звезды. */
+.star-name-overlay{position:fixed; inset:0; z-index:320; pointer-events:none;}
+.star-name-connector{position:absolute; inset:0; width:100%; height:100%;}
+.star-name-connector line{stroke-width:1.5; stroke-dasharray:5 5;}
+.star-name-popup{
+  position:fixed; width:260px; max-width:calc(100vw - 32px); pointer-events:auto;
+  background:var(--modal-bg); border:1px solid var(--border); border-radius:14px;
+  padding:16px; box-shadow:var(--shadow); color:var(--text);
+}
+.star-name-popup p{margin:0 0 10px; font-size:.9rem; line-height:1.4;}
+.star-name-popup input{
+  width:100%; box-sizing:border-box; padding:8px 10px; border-radius:8px; margin-bottom:10px;
+  border:1px solid var(--border); background:var(--input-bg); color:var(--text); font:inherit;
+}
+.star-name-popup input::placeholder{color:var(--muted); opacity:.7;}
+.star-name-actions{display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;}
 /* Солнце и луна: класс view-transition-name НЕ используем — именованная группа рендерится в
    отдельном "верхнем слое" браузера поверх вообще всего документа, то есть луна оказалась бы НАД
    календарём и карточками. Вместо этого — вращение вокруг общего пивота сильно ниже экрана:
