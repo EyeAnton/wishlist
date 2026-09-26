@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import { getDatabase, ref, set, update, remove, onValue } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, set, update, remove, onValue, runTransaction } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
 
 // ====== НАСТРОЙКИ (можно менять) ======
@@ -45,6 +45,7 @@ const LS = {
   introSeen: "wishlist_intro_seen",
   dailyFactSeen: "wishlist_daily_fact_seen",
   factReadDate: "wishlist_fact_read_date",
+  viewCounted: "wishlist_view_counted",
 };
 
 let IS_ADMIN = false;
@@ -252,10 +253,16 @@ function initSky(){
 }
 
 // ====== ПАДАЮЩАЯ ЗВЕЗДА ======
-// Раз в 15-30с (случайно) — только ночью (иначе звёзд не видно, и падающая звезда на светлом
+// Раз в 5-9с (случайно) — только ночью (иначе звёзд не видно, и падающая звезда на светлом
 // небе не имеет смысла); просто планируем следующую попытку и проверяем тему заново на каждом
 // срабатывании, а не один раз при загрузке. Позиция — случайная точка в верхней трети неба; угол
 // полёта — случайный, вниз-по-диагонали, чтобы траектория смотрелась естественно.
+//
+// Количество звёзд за один залп растёт вместе с счётчиком уникальных посетителей сайта
+// (см. watchViewCount/maybeCountView ниже) — чем больше людей заглянуло, тем гуще звездопад.
+// +1 звезда на каждые 10 посетителей, потолок 6 штук за раз (см. starsPerBurst).
+let siteViewCount = 0;
+
 function isNightSky(){
   return parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--night-opacity")) > 0.5;
 }
@@ -278,11 +285,22 @@ function spawnShootingStar(){
   layer.appendChild(wrap);
 }
 
+function starsPerBurst(){
+  return Math.min(1 + Math.floor(siteViewCount / 10), 6);
+}
+
+function spawnShootingStarBurst(){
+  const count = starsPerBurst();
+  for(let i = 0; i < count; i++){
+    setTimeout(spawnShootingStar, i * 150);
+  }
+}
+
 function initShootingStars(){
   if(window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const schedule = () => {
-    const delaySec = 15 + Math.random() * 15;
-    setTimeout(() => { spawnShootingStar(); schedule(); }, delaySec * 1000);
+    const delaySec = 5 + Math.random() * 4;
+    setTimeout(() => { spawnShootingStarBurst(); schedule(); }, delaySec * 1000);
   };
   schedule();
 }
@@ -1776,6 +1794,29 @@ function watchFacts(){
   });
 }
 
+// Счётчик уникальных посетителей — раз за браузер (см. LS.viewCounted), гостей, не владельца.
+// runTransaction нужен, а не просто set(текущее+1) — иначе параллельные гости друг друга
+// перезатирают (оба читают одно и то же старое значение и оба пишут одно и то же +1).
+// Требует отдельного правила в Firebase Security Rules на запись в stats/viewCount — без него
+// транзакция просто тихо падает с PERMISSION_DENIED, и счётчик остаётся на месте (не критично).
+function maybeCountView(){
+  if(IS_ADMIN || !db) return;
+  if(localStorage.getItem(LS.viewCounted)) return;
+  runTransaction(ref(db, "stats/viewCount"), current => (current || 0) + 1)
+    .then(() => localStorage.setItem(LS.viewCounted, "1"))
+    .catch(() => { /* нет доступа или сеть — просто не засчиталось в этот раз */ });
+}
+
+// Живая подписка на общее число посетителей — двигает интенсивность звездопада
+// (см. starsPerBurst выше). Не нужна владельцу отдельно — просто не вредит, поэтому подписываем
+// всех одинаково.
+function watchViewCount(){
+  if(!db) return;
+  onValue(ref(db, "stats/viewCount"), snap => {
+    siteViewCount = Number(snap.val()) || 0;
+  }, () => { /* нет доступа (правило ещё не добавлено) — просто остаёмся с дефолтом 0 */ });
+}
+
 // ====== СТАРТ ======
 export function initApp(opts){
   IS_ADMIN = !!(opts && opts.isAdmin);
@@ -1799,5 +1840,7 @@ export function initApp(opts){
   }
   watchItems();
   watchFacts();
+  watchViewCount();
+  maybeCountView();
   loadRates();
 }
