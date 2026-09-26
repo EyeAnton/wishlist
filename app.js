@@ -361,6 +361,32 @@ function spawnTitleStarBurst(){
   setTimeout(addBonusStar, 9 * 200 + 300);
 }
 
+// "Особый режим": с 9-го клика (звездопад + зажигание + попап называния) и до тех пор, пока
+// попап не закрыт (назвали звезду или погасили) — карточки товаров и календарь плавно уходят в
+// прозрачность, чтобы ничего не отвлекало от неба. Заодно на это время показываем подписи уже
+// существующих именованных звёзд (см. .sky-star-name-label в style.css) — это "витрина" только
+// для владельца текущего клика, у остальных гостей просто тихо появляется звезда (см.
+// watchBonusStars) без всего этого режима.
+function enterStarSpecialMode(){
+  document.body.classList.add("star-mode-dim");
+  bonusStarsData.forEach(({ data }) => {
+    if(!data.name) return;
+    const label = document.createElement("span");
+    label.className = "sky-star-name-label";
+    label.textContent = data.name;
+    label.style.left = `${data.left}%`;
+    label.style.top = `${data.top}%`;
+    label.style.color = `hsl(${data.hue},100%,70%)`;
+    label.dataset.tempLabel = "1";
+    $("#skyStars")?.appendChild(label);
+  });
+}
+
+function exitStarSpecialMode(){
+  document.body.classList.remove("star-mode-dim");
+  document.querySelectorAll('.sky-star-name-label[data-temp-label="1"]').forEach(el => el.remove());
+}
+
 function handleTitleClick(){
   const now = Date.now();
   if(now < titleClickCooldownUntil) return;
@@ -368,6 +394,7 @@ function handleTitleClick(){
   if(titleClickCount >= 9){
     titleClickCount = 0;
     titleClickCooldownUntil = now + 5000;
+    enterStarSpecialMode();
     spawnTitleStarBurst();
   }else{
     spawnShootingStar({ top: Math.random() * 5, left: 40 + Math.random() * 20, angle: 20 + Math.random() * 45, ignoreNight: true });
@@ -397,10 +424,11 @@ function spawnStarRipple(data){
 // добил 9-й клик), либо из Firebase (у всех остальных, см. watchBonusStars) — форма одна и та же.
 // withRipple — только для по-настоящему НОВОГО зажигания (см. вызовы), не для загрузки уже
 // существующих звёзд при открытии страницы (иначе на каждый заход вспыхивало бы разом столько
-// окружностей, сколько звёзд уже накопилось).
+// окружностей, сколько звёзд уже накопилось). Возвращает сам DOM-элемент звезды — нужен, чтобы
+// его можно было убрать при "погасить" (см. openStarNamePopup).
 function renderBonusStar(data, withRipple){
   const layer = $("#skyStars");
-  if(!layer) return;
+  if(!layer) return null;
   const star = document.createElement("span");
   star.className = "sky-star sky-star-bonus";
   const size = (Math.random() * 1.6 + 1.4).toFixed(1);
@@ -412,14 +440,83 @@ function renderBonusStar(data, withRipple){
   star.style.boxShadow = `0 0 6px 2px hsla(${data.hue},100%,70%,.55)`;
   layer.appendChild(star);
   if(withRipple) spawnStarRipple(data);
+  return star;
 }
 
-// Ключ генерируем сами (не push()) и сразу помечаем как отрисованный — иначе собственный же
-// watchBonusStars(), получив это значение обратно из Firebase, нарисует его второй раз поверх.
-// Требует отдельного правила в Firebase Security Rules на запись в sky/bonusStars — как и
-// stats/viewCount (см. maybeCountView), без правила просто тихо не сохранится: инициатор всё
-// равно видит звезду локально, остальные — только после того, как правило добавят.
-let bonusStarsRendered = new Set();
+// key -> { data, starEl } для ВСЕХ известных звёзд (своих и чужих) — нужно, чтобы во время
+// enterStarSpecialMode() показать подписи уже названных звёзд, и чтобы "погасить" могло найти и
+// убрать DOM-элемент конкретной звезды. Ключ генерируем сами (не push()) и сразу отмечаем как
+// известный — иначе собственный же watchBonusStars(), получив это значение обратно из Firebase,
+// отрисует его второй раз поверх. Требует отдельного правила в Firebase Security Rules на запись
+// в sky/bonusStars — как и stats/viewCount (см. maybeCountView), без правила просто тихо не
+// сохранится: инициатор всё равно видит звезду локально, остальные — только после того, как
+// правило добавят.
+let bonusStarsData = new Map();
+
+const STAR_NAME_SUGGESTIONS = ["Вега", "Регул", "Спика", "Ригель", "Альтаир", "Полярная", "Денеб", "Антарес"];
+
+// Попап называния — НЕ через общий openModal (тот всегда по центру), а отдельным оверлеем:
+// позиционируется рядом со звездой, с "умной" стороной (если звезда у правого края экрана — попап
+// открывается слева от неё, и наоборот, чтобы весь попап помещался на экране), плюс пунктирная
+// линия-коннектор к звезде. Показывается только инициатору 9-го клика — остальные гости просто
+// видят готовую звезду через watchBonusStars, без этого попапа и без затемнения.
+function openStarNamePopup(key, data, starEl){
+  const sx = (data.left / 100) * window.innerWidth;
+  const sy = (data.top / 100) * window.innerHeight;
+  const suggested = STAR_NAME_SUGGESTIONS[Math.floor(Math.random() * STAR_NAME_SUGGESTIONS.length)];
+
+  const overlay = document.createElement("div");
+  overlay.className = "star-name-overlay";
+  overlay.innerHTML = `
+    <svg class="star-name-connector"><line/></svg>
+    <div class="star-name-popup">
+      <p>Вы только что зажгли звезду, она будет светить всем! Как вы назовёте эту звезду?</p>
+      <input type="text" id="starNameInput" placeholder="${escapeHtml(suggested)}">
+      <div class="star-name-actions">
+        <button type="button" class="secondary" id="starExtinguishBtn">Погасить звезду</button>
+        <button type="button" id="starNameSaveBtn">Назвать</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const popup = overlay.querySelector(".star-name-popup");
+  const line = overlay.querySelector("line");
+  const margin = 16;
+  const popupRect = popup.getBoundingClientRect();
+  const placeLeft = sx > window.innerWidth * 0.6;
+  let popupLeft = placeLeft ? sx - popupRect.width - margin : sx + margin;
+  popupLeft = Math.max(margin, Math.min(popupLeft, window.innerWidth - popupRect.width - margin));
+  let popupTop = sy - popupRect.height / 2;
+  popupTop = Math.max(margin, Math.min(popupTop, window.innerHeight - popupRect.height - margin));
+  popup.style.left = `${popupLeft}px`;
+  popup.style.top = `${popupTop}px`;
+
+  const px = placeLeft ? popupLeft + popupRect.width : popupLeft;
+  const py = popupTop + popupRect.height / 2;
+  line.setAttribute("x1", sx); line.setAttribute("y1", sy);
+  line.setAttribute("x2", px); line.setAttribute("y2", py);
+  line.setAttribute("stroke", `hsla(${data.hue},100%,70%,.3)`);
+
+  overlay.querySelector("#starNameInput").focus();
+
+  function closeOverlay(){
+    overlay.remove();
+    exitStarSpecialMode();
+  }
+  overlay.querySelector("#starNameSaveBtn").addEventListener("click", () => {
+    const val = overlay.querySelector("#starNameInput").value.trim() || suggested;
+    data.name = val;
+    if(db) update(ref(db, "sky/bonusStars/" + key), { name: val }).catch(() => { /* нет доступа — правило ещё не добавлено */ });
+    closeOverlay();
+  });
+  overlay.querySelector("#starExtinguishBtn").addEventListener("click", () => {
+    bonusStarsData.delete(key);
+    starEl?.remove();
+    if(db) remove(ref(db, "sky/bonusStars/" + key)).catch(() => { /* нет доступа — правило ещё не добавлено */ });
+    closeOverlay();
+  });
+}
 
 function addBonusStar(){
   const key = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -428,9 +525,11 @@ function addBonusStar(){
     opacity: Number((0.8 + Math.random() * 0.2).toFixed(2)),
     left: Number((Math.random() * 100).toFixed(2)),
     top: Number((Math.random() * 70).toFixed(2)),
+    name: null,
   };
-  bonusStarsRendered.add(key);
-  renderBonusStar(data, true);
+  const starEl = renderBonusStar(data, true);
+  bonusStarsData.set(key, { data, starEl });
+  openStarNamePopup(key, data, starEl);
   if(!db) return;
   set(ref(db, "sky/bonusStars/" + key), data).catch(() => { /* нет доступа — правило ещё не добавлено */ });
 }
@@ -438,7 +537,9 @@ function addBonusStar(){
 // Первый снапшот onValue отдаёт ВСЕ уже существующие звёзды разом — их рисуем тихо, без ripple
 // (иначе при каждом заходе на сайт вспыхивало бы столько окружностей, сколько звёзд накопилось
 // за всё время). Ripple — только для действительно новых ключей, появившихся ПОСЛЕ первого
-// снапшота (то есть кто-то ещё, в реальном времени, только что добил свой 9-й клик).
+// снапшота (то есть кто-то ещё, в реальном времени, только что добил свой 9-й клик) — у них
+// просто зажигается звезда с кругом, без затемнения экрана и без попапа (это только у инициатора,
+// см. addBonusStar).
 let bonusStarsInitialLoadDone = false;
 
 function watchBonusStars(){
@@ -447,9 +548,10 @@ function watchBonusStars(){
     const val = snap.val() || {};
     const isLiveUpdate = bonusStarsInitialLoadDone;
     Object.keys(val).forEach(key => {
-      if(bonusStarsRendered.has(key)) return;
-      bonusStarsRendered.add(key);
-      renderBonusStar(val[key], isLiveUpdate);
+      if(bonusStarsData.has(key)) return;
+      const data = val[key];
+      const starEl = renderBonusStar(data, isLiveUpdate);
+      bonusStarsData.set(key, { data, starEl });
     });
     bonusStarsInitialLoadDone = true;
   }, () => { /* нет доступа (правило ещё не добавлено) — просто не подгружаем чужие звёзды */ });
