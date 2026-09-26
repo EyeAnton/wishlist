@@ -147,9 +147,19 @@ body{
 @media (prefers-reduced-motion: reduce){
   .sky-star{animation:none; opacity:.6;}
 }
-/* Звезда-пасхалка (см. addBonusStar в app.js) — не мерцает, как обычные: цвет и непрозрачность
-   у неё уже сами по себе случайные и постоянные, обычный twinkle (0.15↔1) их бы просто перекрыл. */
+/* Звезда-пасхалка (см. addBonusStar в app.js) — не мерцает бесконечно, как обычные: цвет и
+   непрозрачность у неё уже сами по себе случайные и постоянные, обычный twinkle (0.15↔1) их бы
+   просто перекрыл. Вместо этого — конечный пульс яркости именно в момент появления (см.
+   .sky-star-bonus-pulse ниже), после которого звезда успокаивается на var(--star-base-opacity). */
 .sky-star-bonus{animation:none;}
+.sky-star-bonus-pulse{animation:sky-star-bonus-pulse .7s ease-in-out 3;}
+@keyframes sky-star-bonus-pulse{
+  0%, 100%{opacity:var(--star-base-opacity, 1);}
+  50%{opacity:.25;}
+}
+@media (prefers-reduced-motion: reduce){
+  .sky-star-bonus-pulse{animation:none;}
+}
 /* Расходящаяся окружность в момент зажигания новой звезды (см. spawnStarRipple в app.js) — растёт
    от точки до 100vmax в диаметре (то есть до половины экрана по радиусу, если считать по большей
    стороне) и одновременно гаснет до полной прозрачности. pointer-events:none — это просто
@@ -211,12 +221,20 @@ body.star-mode-dim #main, body.star-mode-dim #countdown{opacity:0; pointer-event
 .star-name-input-wrap input::placeholder{color:var(--muted); opacity:.7;}
 /* Кнопка "назвать" — галочка внутри поля ввода, как кнопка отправки в мессенджерах, а не отдельная
    подписанная кнопка снаружи. */
+/* "Пустая" (не залитая) галочка, пока в поле нет текста — заполняется цветом только когда есть
+   что называть (см. .is-filled, переключается по input-событию в openStarNamePopup), как кнопка
+   отправки в мессенджерах. Без transition на background/border-color/color тут намеренно — оба
+   набора цветов читают уже анимирующиеся при смене темы var(--border)/var(--muted)/
+   var(--accent-solid) (см. начало файла), а свой transition поверх них — тот самый двойной
+   переход, которого специально избегаем по всему сайту. */
 .star-name-input-wrap button{
   position:absolute; top:50%; right:4px; transform:translateY(-50%);
-  width:26px; height:26px; padding:0; border-radius:50%; border:none;
-  background:var(--accent-solid); color:#fff; display:flex; align-items:center; justify-content:center;
+  width:26px; height:26px; padding:0; border-radius:50%;
+  background:none; border:1.5px solid var(--border); color:var(--muted);
+  display:flex; align-items:center; justify-content:center;
 }
-.star-name-input-wrap button:hover{background:var(--accent-hover);}
+.star-name-input-wrap button.is-filled{background:var(--accent-solid); border-color:var(--accent-solid); color:#fff;}
+.star-name-input-wrap button.is-filled:hover{background:var(--accent-hover); border-color:var(--accent-hover);}
 .star-name-input-wrap svg{width:14px; height:14px;}
 /* "Погасить звезду" — просто текстовая ссылка снизу, без прямоугольника кнопки: это редкое,
    разрушительное действие, не должно визуально спорить с основным сценарием (назвать). */

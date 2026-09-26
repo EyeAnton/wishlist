@@ -335,13 +335,43 @@ function initShootingStars(){
 
 // ====== ПАСХАЛКА: КЛИК ПО ЗАГОЛОВКУ ======
 // "Вишлист" в шапке гостевой страницы раньше был ссылкой на admin.html — теперь владелец заходит
-// туда напрямую по адресу, а заголовок стал маленькой пасхалкой (см. #titleClickTarget в
-// index.html). Обычный клик роняет одну звезду — намеренно в любое время суток (ignoreNight),
-// иначе шутка не сработает днём. Каждый 9-й клик — цветной звездопад (см. spawnTitleStarBurst) и
-// новая звезда остаётся в небе навсегда, для всех гостей (см. addBonusStar/watchBonusStars).
-// После 9-го клика 5 секунд клики по заголовку игнорируются, чтобы не заспамить.
-let titleClickCount = 0;
-let titleClickCooldownUntil = 0;
+// туда напрямую по адресу, а заголовок стал маленькой пасхалкой (см. #titleClickTarget/#titleText
+// в index.html). Обычный клик роняет одну звезду — намеренно в любое время суток (ignoreNight),
+// иначе шутка не сработает днём — и одновременно подсвечивает очередную букву заголовка цветом
+// радуги (в слове "Вишлист" ровно 7 букв — см. litNextTitleLetter). Когда подсвечены уже все 7 —
+// вместо одной звезды срабатывает цветной звездопад (см. spawnTitleStarBurst) и новая звезда
+// остаётся в небе навсегда, для всех гостей (см. addBonusStar/watchBonusStars). После этого
+// заголовок необратимо блокируется до конца сессии (см. titleEasterEggLocked) — текст остаётся
+// радужным, повторно пасхалку не запустить, пока страница не перезагрузится.
+const TITLE_RAINBOW_COLORS = ["#ff3b30", "#ff9500", "#ffcc00", "#34c759", "#0a84ff", "#5e5ce6", "#af52de"];
+let titleLetterIndex = 0;
+let titleEasterEggLocked = false;
+
+// Разбивает текст заголовка на отдельные span'ы по буквам — один раз при старте, до этого клики
+// подсвечивать нечего. Само экранирование не нужно: буквы кириллицы/латиницы не содержат
+// спецсимволов HTML, а textContent уже отдал их в чистом виде.
+function initTitleLetters(){
+  const el = $("#titleText");
+  if(!el || el.dataset.split) return;
+  el.dataset.split = "1";
+  el.innerHTML = Array.from(el.textContent).map(ch => `<span class="title-letter">${ch}</span>`).join("");
+}
+
+function litNextTitleLetter(){
+  const letters = document.querySelectorAll("#titleText .title-letter");
+  if(titleLetterIndex >= letters.length) return;
+  const el = letters[titleLetterIndex];
+  const color = TITLE_RAINBOW_COLORS[titleLetterIndex % TITLE_RAINBOW_COLORS.length];
+  // transition — только тут, точечно на конкретной букве, в момент её единственного и
+  // необратимого перехода от "наследует var(--text)" к фиксированному цвету радуги. НЕ через
+  // общее CSS-правило на .title-letter — иначе оно цепляло бы и ещё непогашенные буквы, чей цвет
+  // всё ещё пассивно едет вместе с темой (var(--text) уже анимируется на :root — см. начало
+  // файла), и получился бы тот самый двойной переход.
+  el.style.transition = "color .3s ease, text-shadow .3s ease";
+  el.style.color = color;
+  el.style.textShadow = `0 0 6px ${color}, 0 0 14px ${color}`;
+  titleLetterIndex++;
+}
 
 function spawnTitleStarBurst(){
   for(let i = 0; i < 9; i++){
@@ -388,12 +418,12 @@ function exitStarSpecialMode(){
 }
 
 function handleTitleClick(){
-  const now = Date.now();
-  if(now < titleClickCooldownUntil) return;
-  titleClickCount++;
-  if(titleClickCount >= 9){
-    titleClickCount = 0;
-    titleClickCooldownUntil = now + 5000;
+  if(titleEasterEggLocked) return;
+  litNextTitleLetter();
+  if(titleLetterIndex >= TITLE_RAINBOW_COLORS.length){
+    // Необратимо: назад к titleLetterIndex=0 сознательно не откатываем, даже если погасят
+    // звезду — пасхалка одноразовая на сессию, а не циклический счётчик.
+    titleEasterEggLocked = true;
     enterStarSpecialMode();
     spawnTitleStarBurst();
   }else{
@@ -419,27 +449,31 @@ function spawnStarRipple(data){
   layer.appendChild(ripple);
 }
 
-// Звезда-пасхалка рисуется в общий #skyStars (мерцающий фон), но без твинкла — см.
-// .sky-star-bonus в style.css. data приходит либо только что сгенерированной (у того, кто
-// добил 9-й клик), либо из Firebase (у всех остальных, см. watchBonusStars) — форма одна и та же.
-// withRipple — только для по-настоящему НОВОГО зажигания (см. вызовы), не для загрузки уже
-// существующих звёзд при открытии страницы (иначе на каждый заход вспыхивало бы разом столько
-// окружностей, сколько звёзд уже накопилось). Возвращает сам DOM-элемент звезды — нужен, чтобы
-// его можно было убрать при "погасить" (см. openStarNamePopup).
-function renderBonusStar(data, withRipple){
+// Звезда-пасхалка рисуется в общий #skyStars (мерцающий фон), но без постоянного твинкла — см.
+// .sky-star-bonus в style.css: цвет и непрозрачность у неё уже сами по себе случайные и
+// постоянные, обычный бесконечный twinkle их бы просто перекрыл. Вместо этого — конечный
+// пульс яркости именно в момент появления (см. isNewAppearance/.sky-star-bonus-pulse), после
+// которого звезда успокаивается на своей обычной непрозрачности.
+// data приходит либо только что сгенерированной (у того, кто добил 9-й клик), либо из Firebase
+// (у всех остальных, см. watchBonusStars) — форма одна и та же. isNewAppearance — только для
+// по-настоящему НОВОГО появления, не для загрузки уже существующих звёзд при открытии страницы
+// (иначе на каждый заход запульсировало бы разом столько звёзд, сколько уже накопилось).
+// Возвращает сам DOM-элемент звезды — нужен, чтобы его можно было убрать при "погасить" (см.
+// openStarNamePopup).
+function renderBonusStar(data, isNewAppearance){
   const layer = $("#skyStars");
   if(!layer) return null;
   const star = document.createElement("span");
-  star.className = "sky-star sky-star-bonus";
+  star.className = "sky-star sky-star-bonus" + (isNewAppearance ? " sky-star-bonus-pulse" : "");
   const size = (Math.random() * 1.6 + 1.4).toFixed(1);
   star.style.left = `${data.left}%`;
   star.style.top = `${data.top}%`;
   star.style.width = star.style.height = `${size}px`;
   star.style.background = `hsl(${data.hue},100%,70%)`;
   star.style.opacity = data.opacity;
+  star.style.setProperty("--star-base-opacity", data.opacity);
   star.style.boxShadow = `0 0 6px 2px hsla(${data.hue},100%,70%,.55)`;
   layer.appendChild(star);
-  if(withRipple) spawnStarRipple(data);
   return star;
 }
 
@@ -504,7 +538,15 @@ function openStarNamePopup(key, data, starEl){
   line.setAttribute("x2", px); line.setAttribute("y2", py);
   line.setAttribute("stroke", `hsla(${data.hue},100%,70%,.3)`);
 
-  overlay.querySelector("#starNameInput").focus();
+  const nameInput = overlay.querySelector("#starNameInput");
+  const confirmBtn = overlay.querySelector("#starNameSaveBtn");
+  nameInput.focus();
+  // Галочка "пустая" (см. .star-name-input-wrap button в style.css), пока в поле ничего не
+  // введено — заполняется цветом только когда там реально есть текст, как кнопка отправки в
+  // мессенджерах.
+  nameInput.addEventListener("input", () => {
+    confirmBtn.classList.toggle("is-filled", nameInput.value.trim().length > 0);
+  });
 
   function closeOverlay(){
     overlay.remove();
@@ -537,24 +579,26 @@ function addBonusStar(){
     hue: Math.floor(Math.random() * 360),
     opacity: Number((0.8 + Math.random() * 0.2).toFixed(2)),
     left: Number((Math.random() * 100).toFixed(2)),
-    top: Number((Math.random() * 70).toFixed(2)),
+    // Только верхняя треть экрана — ниже звезду вместе с попапом называния перекрывает
+    // мобильная клавиатура, пока вводишь имя.
+    top: Number((Math.random() * 33).toFixed(2)),
     name: null,
   };
-  // Без ripple тут — расходящийся круг теперь играет ПОСЛЕ того, как звезду назвали (см.
-  // openStarNamePopup), а не в момент появления самой точки.
-  const starEl = renderBonusStar(data, false);
+  // isNewAppearance:true — пульс яркости играет тут, при появлении самой точки. Ripple (круг) —
+  // отдельно, ПОСЛЕ того как звезду назвали (см. openStarNamePopup), не в этот момент.
+  const starEl = renderBonusStar(data, true);
   bonusStarsData.set(key, { data, starEl });
   openStarNamePopup(key, data, starEl);
   if(!db) return;
   set(ref(db, "sky/bonusStars/" + key), data).catch(() => { /* нет доступа — правило ещё не добавлено */ });
 }
 
-// Первый снапшот onValue отдаёт ВСЕ уже существующие звёзды разом — их рисуем тихо, без ripple
-// (иначе при каждом заходе на сайт вспыхивало бы столько окружностей, сколько звёзд накопилось
-// за всё время). Ripple — только для действительно новых ключей, появившихся ПОСЛЕ первого
-// снапшота (то есть кто-то ещё, в реальном времени, только что добил свой 9-й клик) — у них
-// просто зажигается звезда с кругом, без затемнения экрана и без попапа (это только у инициатора,
-// см. addBonusStar).
+// Первый снапшот onValue отдаёт ВСЕ уже существующие звёзды разом — их рисуем тихо, без пульса и
+// без ripple (иначе при каждом заходе на сайт разом запульсировало и вспыхнуло бы столько звёзд,
+// сколько накопилось за всё время). Пульс и ripple — только для действительно новых ключей,
+// появившихся ПОСЛЕ первого снапшота (то есть кто-то ещё, в реальном времени, только что добил
+// свой 9-й клик) — у них просто зажигается звезда с пульсом и кругом, без затемнения экрана и без
+// попапа (это только у инициатора, см. addBonusStar).
 let bonusStarsInitialLoadDone = false;
 
 function watchBonusStars(){
@@ -567,6 +611,7 @@ function watchBonusStars(){
       const data = val[key];
       const starEl = renderBonusStar(data, isLiveUpdate);
       bonusStarsData.set(key, { data, starEl });
+      if(isLiveUpdate) spawnStarRipple(data);
     });
     bonusStarsInitialLoadDone = true;
   }, () => { /* нет доступа (правило ещё не добавлено) — просто не подгружаем чужие звёзды */ });
@@ -2097,6 +2142,7 @@ export function initApp(opts){
     initGoogleSignIn();
   }else{
     renderTopContacts();
+    initTitleLetters();
     $("#titleClickTarget")?.addEventListener("click", handleTitleClick);
     $("#infoBtn")?.addEventListener("click", openIntroModal);
     // openModal() закрывает предыдущий попап, так что оба сразу показать нельзя — в самый
