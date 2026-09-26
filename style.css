@@ -187,10 +187,12 @@ body.star-mode-dim #main, body.star-mode-dim #countdown{opacity:0; pointer-event
 .star-name-connector-dash{
   stroke-width:1.5; stroke-dasharray:5 5; animation:star-name-dash-flow 1s linear infinite;
 }
-/* Отрицательное смещение — пунктир едет в направлении от (x2,y2) [попап] к (x1,y1) [звезда]. */
+/* Линия идёт от (x1,y1) [звезда] к (x2,y2) [попап] — увеличивающийся (положительный) dashoffset
+   сдвигает видимый пунктир к НАЧАЛУ пути, то есть к звезде (проверено вживую: со знаком минус
+   пунктир вместо этого "убегал" к попапу — ровно наоборот от задуманного). */
 @keyframes star-name-dash-flow{
   0%{stroke-dashoffset:0;}
-  100%{stroke-dashoffset:-20;}
+  100%{stroke-dashoffset:20;}
 }
 @media (prefers-reduced-motion: reduce){
   .star-name-connector-dash{animation:none;}
