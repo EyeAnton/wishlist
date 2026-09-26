@@ -258,8 +258,12 @@ header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; g
   outline:none; -webkit-tap-highlight-color:transparent;
 }
 /* Заголовок не должен НИЧЕМ выделяться при клике/тапе — ни рамкой фокуса, ни серой вспышкой тача
-   (см. outline/-webkit-tap-highlight-color выше). Единственное исключение — навигация с
-   клавиатуры (Tab): там нужна видимая рамка ради доступности, но она не связана с мышью/тачем. */
+   (см. outline/-webkit-tap-highlight-color выше), ни фоном при наведении/нажатии: это <button>,
+   а глобальное button:hover{background:var(--accent-hover)} (см. ниже, для обычных кнопок сайта)
+   иначе перекрашивало бы и заголовок тоже — своя специфичность у класса выше типового селектора,
+   так что достаточно явно вернуть none. Единственное исключение — навигация с клавиатуры (Tab):
+   там нужна видимая рамка ради доступности, но она не связана с мышью/тачем. */
+.topbar-title:hover, .topbar-title:active{background:none;}
 .topbar-title:focus-visible{outline:2px solid var(--accent-solid); outline-offset:4px;}
 /* width:100% обязателен: без него topbar-row как flex-item внутри header.topbar сжимается
    по контенту и margin-left:auto ниже не имеет свободного места, чтобы прижать тему к краю. */
