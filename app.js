@@ -44,6 +44,7 @@ const LS = {
   rates: "wishlist_rates_cache",
   introSeen: "wishlist_intro_seen",
   dailyFactSeen: "wishlist_daily_fact_seen",
+  factReadDate: "wishlist_fact_read_date",
 };
 
 let IS_ADMIN = false;
@@ -333,28 +334,48 @@ function renderCountdown(){
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const target = getBirthdayTarget(today);
   const daysLeft = Math.round((target - today) / DAY_MS);
-  const label = daysLeft <= 0 ? "Сегодня 1 октября! 🎉" : `Осталось ${daysLeft} ${daysWord(daysLeft)}!`;
+  const label = daysLeft <= 0 ? "Сегодня 1 октября! 🎉" : `До ДР Антона ${daysLeft} ${daysWord(daysLeft)}!`;
 
   // По клеточке на каждый день от фиксированного старта до 1 октября — ряд не сжимается со
   // временем. У последней клетки (день Х) число остаётся на месте (иначе неясно, что это именно
-  // 1 октября), а праздничный эмодзи ложится полупрозрачным фоном под цифрой. Прошедшие клетки
-  // (включая сегодняшнюю — её факт уже открыт) выглядят слегка оторванными и, если для них есть
-  // факт про Антона, кликабельны — открывают попап с текстом. Владельцу (после входа) кликабельны
-  // вообще все клетки, включая будущие без текста, — так он может писать факты заранее.
+  // 1 октября), а праздничный эмодзи ложится полупрозрачным фоном под цифрой. Сегодняшняя клетка
+  // обведена оранжевым (см. .calendar-cell-today) — раньше рамка была у 1 октября, но это далёкая
+  // будущая дата, а обводить хотелось именно "где мы сейчас". Прошедшие клетки, и сегодняшняя ПОСЛЕ
+  // прочтения факта (см. openFactModal — отмечает LS.factReadDate), выглядят слегка оторванными:
+  // наклон + чем клетка старше, тем сильнее блёкнет (см. --cell-opacity ниже). Сегодняшняя, пока
+  // факт не открыт, стоит ровно и в полную силу — это и есть "непрочитано". Кликабельны клетки, для
+  // которых есть факт (включая сегодняшнюю, до или после прочтения). Владельцу (после входа)
+  // кликабельны вообще все клетки, включая будущие без текста, — так он может писать факты заранее.
   const canEditFacts = IS_ADMIN && state.isOwner;
   const totalDays = Math.round((target - CALENDAR_START) / DAY_MS) + 1;
+  const daysSinceStart = Math.round((today - CALENDAR_START) / DAY_MS);
+  const todayFactRead = localStorage.getItem(LS.factReadDate) === dateKey(today);
+  // Градиент затухания прошедших дней: чем дальше в прошлом, тем прозрачнее. Позавчера и раньше —
+  // от 5% (самый старый) до 40%, равномерно. Вчера — отдельно, 45% (на ступеньку выше этого
+  // диапазона). Сегодня — не по этой шкале: 100% пока факт не открыт, 50% сразу после прочтения.
+  const olderCount = Math.max(daysSinceStart - 1, 0);
+  function pastOpacity(i){
+    if(i === daysSinceStart - 1) return 0.45; // вчера
+    if(olderCount <= 1) return 0.05;
+    return 0.05 + (i / (olderCount - 1)) * 0.35;
+  }
   const cells = Array.from({ length: Math.max(totalDays, 0) }, (_, i) => {
     const d = new Date(CALENDAR_START.getTime() + i * DAY_MS);
     const isTarget = d.getTime() === target.getTime();
-    const isPast = d.getTime() <= today.getTime();
+    const isToday = d.getTime() === today.getTime();
+    const isPastStrict = d.getTime() < today.getTime();
+    const canView = d.getTime() <= today.getTime();
     const key = dateKey(d);
-    const clickable = canEditFacts || (isPast && DAILY_FACTS[key]);
+    const clickable = canEditFacts || (canView && DAILY_FACTS[key]);
+    const tilted = isPastStrict || (isToday && todayFactRead);
     const dayContent = isTarget
       ? `<span class="calendar-cell-confetti">🎉</span><span class="calendar-cell-daynum">${d.getDate()}</span>`
       : d.getDate();
-    const classes = ["calendar-cell", isTarget && "calendar-cell-target", isPast && "calendar-cell-past"].filter(Boolean).join(" ");
+    const classes = ["calendar-cell", isTarget && "calendar-cell-target", isToday && "calendar-cell-today", tilted && "calendar-cell-past"].filter(Boolean).join(" ");
+    const opacity = isToday ? (todayFactRead ? 0.5 : 1) : (isPastStrict ? pastOpacity(i) : null);
+    const style = opacity !== null ? ` style="--cell-opacity:${opacity}"` : "";
     return `
-      <div class="${classes}"${clickable ? ` data-fact-date="${key}"` : ""}>
+      <div class="${classes}"${clickable ? ` data-fact-date="${key}"` : ""}${style}>
         <div class="calendar-cell-dow">${isTarget ? MONTH_SHORT[d.getMonth()] : DOW_SHORT[d.getDay()]}</div>
         <div class="calendar-cell-day">${dayContent}</div>
       </div>
@@ -379,6 +400,14 @@ function renderCountdown(){
 function openFactModal(key){
   const html = DAILY_FACTS[key];
   if(!html) return;
+  // Открытие факта СЕГОДНЯШНЕГО дня — это и есть "прочитано": клетка перестаёт стоять ровно и
+  // в полную силу, наклоняется и блёкнет до 50%, как и остальные прошедшие (см. renderCountdown).
+  const now = new Date();
+  const todayKey = dateKey(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
+  if(key === todayKey && localStorage.getItem(LS.factReadDate) !== todayKey){
+    localStorage.setItem(LS.factReadDate, todayKey);
+    renderCountdown();
+  }
   const [y, m, d] = key.split("-").map(Number);
   openModal(`
     <div class="fact-popup-header">
