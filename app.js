@@ -45,6 +45,7 @@ const LS = {
   introSeen: "wishlist_intro_seen",
   dailyFactSeen: "wishlist_daily_fact_seen",
   factReadDate: "wishlist_fact_read_date",
+  titleEasterEggDone: "wishlist_title_easter_egg_done",
 };
 
 let IS_ADMIN = false;
@@ -327,20 +328,37 @@ function spawnShootingStar(opts){
 // радуги (в слове "Вишлист" ровно 7 букв — см. litNextTitleLetter). Когда подсвечены уже все 7 —
 // вместо одной звезды срабатывает цветной звездопад (см. spawnTitleStarBurst) и новая звезда
 // остаётся в небе навсегда, для всех гостей (см. addBonusStar/watchBonusStars). После этого
-// заголовок необратимо блокируется до конца сессии (см. titleEasterEggLocked) — текст остаётся
-// радужным, повторно пасхалку не запустить, пока страница не перезагрузится.
+// заголовок необратимо блокируется (см. titleEasterEggLocked) — текст остаётся радужным,
+// повторно пасхалку не запустить. Это сохраняется в localStorage (LS.titleEasterEggDone), а не
+// только в памяти — иначе при каждой новой загрузке страницы гость должен был бы заново кликать
+// 7 раз, чтобы снова попасть в режим просмотра своей звезды, вместо одного клика.
 const TITLE_RAINBOW_COLORS = ["#ff3b30", "#ff9500", "#ffcc00", "#34c759", "#0a84ff", "#5e5ce6", "#af52de"];
 let titleLetterIndex = 0;
 let titleEasterEggLocked = false;
 
+function litAllTitleLettersInstant(){
+  const letters = document.querySelectorAll("#titleText .title-letter");
+  letters.forEach((el, i) => {
+    const color = TITLE_RAINBOW_COLORS[i % TITLE_RAINBOW_COLORS.length];
+    el.style.textShadow = `0 0 6px ${color}, 0 0 14px ${color}`;
+  });
+  titleLetterIndex = letters.length;
+}
+
 // Разбивает текст заголовка на отдельные span'ы по буквам — один раз при старте, до этого клики
 // подсвечивать нечего. Само экранирование не нужно: буквы кириллицы/латиницы не содержат
-// спецсимволов HTML, а textContent уже отдал их в чистом виде.
+// спецсимволов HTML, а textContent уже отдал их в чистом виде. Если пасхалка уже была разыграна
+// в прошлый визит — сразу показываем радужный (уже "разряженный") заголовок и включаем блокировку,
+// без повторного прохождения всех 7 кликов.
 function initTitleLetters(){
   const el = $("#titleText");
   if(!el || el.dataset.split) return;
   el.dataset.split = "1";
   el.innerHTML = Array.from(el.textContent).map(ch => `<span class="title-letter">${ch}</span>`).join("");
+  if(localStorage.getItem(LS.titleEasterEggDone)){
+    titleEasterEggLocked = true;
+    litAllTitleLettersInstant();
+  }
 }
 
 // Подсказка-приглашение: через 3с после открытия страницы, и затем каждые 5с, заголовок дважды
@@ -364,6 +382,9 @@ function pulseTitleHint(){
 }
 
 function startTitleHint(){
+  // Не нужна тому, кто уже разыграл пасхалку раньше (см. LS.titleEasterEggDone) — заголовок и
+  // так уже радужный, повторный "приглашающий" пульс поверх этого только сбивал бы с толку.
+  if(titleEasterEggLocked) return;
   if(window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   titleHintTimer = setTimeout(() => {
     pulseTitleHint();
@@ -489,8 +510,10 @@ function handleTitleClick(){
   litNextTitleLetter();
   if(titleLetterIndex >= TITLE_RAINBOW_COLORS.length){
     // Необратимо: назад к titleLetterIndex=0 сознательно не откатываем, даже если погасят
-    // звезду — пасхалка одноразовая на сессию, а не циклический счётчик.
+    // звезду — пасхалка одноразовая, не циклический счётчик. Сохраняем в localStorage, а не
+    // только в памяти — см. комментарий у initTitleLetters/LS.titleEasterEggDone.
     titleEasterEggLocked = true;
+    localStorage.setItem(LS.titleEasterEggDone, "1");
     enterStarSpecialMode();
     spawnTitleStarBurst();
   }else{
