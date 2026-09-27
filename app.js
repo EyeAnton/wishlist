@@ -492,6 +492,9 @@ function toggleStarViewMode(){
   starViewModeActive = !starViewModeActive;
   const btn = $("#titleClickTarget");
   document.body.classList.toggle("star-view-mode", starViewModeActive);
+  // Карточки/календарь тоже уходят — та же прозрачность .star-mode-dim, что и у особого режима
+  // 9-го клика (см. enterStarSpecialMode), переиспользуем как есть.
+  document.body.classList.toggle("star-mode-dim", starViewModeActive);
   if(starViewModeActive){
     if(btn) btn.style.opacity = "0.3";
     showNamedStarLabels();

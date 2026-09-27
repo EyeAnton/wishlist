@@ -187,12 +187,15 @@ body{
 #main, #countdown{transition:opacity .5s ease;}
 body.star-mode-dim #main, body.star-mode-dim #countdown{opacity:0; pointer-events:none;}
 /* Режим "посмотреть свою звезду" (см. toggleStarViewMode в app.js, после того как пасхалка уже
-   разыграна) — тема, контакты и иконка подарка полностью убираются (display:none, не просто
-   прозрачность): ничего не должно отвлекать от неба и подписей звёзд. */
+   разыграна) — тема, контакты и иконка подарка полностью убираются: ничего не должно отвлекать от
+   неба и подписей звёзд. visibility:hidden, а НЕ display:none — иконка подарка сидит внутри того
+   же flex-контейнера, что и текст заголовка (.topbar-title), и display:none выкинул бы её из
+   потока, сдвигая "Вишлист" влево на её место; visibility:hidden прячет, но место оставляет —
+   заголовок остаётся ровно там же. */
 body.star-view-mode #themeToggle,
 body.star-view-mode #topContacts,
 body.star-view-mode .title-gift-icon{
-  display:none;
+  visibility:hidden;
 }
 /* Обычные фоновые звёзды приглушаются (см. --star-dim-mult выше), чтобы именованные выделялись. */
 body.star-view-mode{--star-dim-mult:.3;}
