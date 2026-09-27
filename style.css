@@ -140,12 +140,16 @@ body{
   position:absolute; border-radius:50%; background:#fff;
   animation-name:sky-twinkle; animation-iteration-count:infinite; animation-timing-function:ease-in-out;
 }
+/* --star-dim-mult — обычные фоновые звёзды приглушаются в режиме просмотра своей звезды (см.
+   body.star-view-mode ниже), чтобы цветные именованные звёзды выделялись на их фоне. Только
+   .sky-star с этой анимацией — у .sky-star-bonus непрозрачность всегда своя, инлайновая (см.
+   renderBonusStar в app.js), она сильнее любого правила класса и этим множителем не трогается. */
 @keyframes sky-twinkle{
-  0%,100%{opacity:.15;}
-  50%{opacity:1;}
+  0%,100%{opacity:calc(.15 * var(--star-dim-mult, 1));}
+  50%{opacity:calc(1 * var(--star-dim-mult, 1));}
 }
 @media (prefers-reduced-motion: reduce){
-  .sky-star{animation:none; opacity:.6;}
+  .sky-star{animation:none; opacity:calc(.6 * var(--star-dim-mult, 1));}
 }
 /* Звезда-пасхалка (см. addBonusStar в app.js) — не мерцает бесконечно, как обычные: цвет и
    непрозрачность у неё уже сами по себе случайные и постоянные, обычный twinkle (0.15↔1) их бы
@@ -182,11 +186,24 @@ body{
    (не только под .star-mode-dim), иначе не сыграет обратно при выходе из режима. */
 #main, #countdown{transition:opacity .5s ease;}
 body.star-mode-dim #main, body.star-mode-dim #countdown{opacity:0; pointer-events:none;}
+/* Режим "посмотреть свою звезду" (см. toggleStarViewMode в app.js, после того как пасхалка уже
+   разыграна) — тема, контакты и иконка подарка полностью убираются (display:none, не просто
+   прозрачность): ничего не должно отвлекать от неба и подписей звёзд. */
+body.star-view-mode #themeToggle,
+body.star-view-mode #topContacts,
+body.star-view-mode .title-gift-icon{
+  display:none;
+}
+/* Обычные фоновые звёзды приглушаются (см. --star-dim-mult выше), чтобы именованные выделялись. */
+body.star-view-mode{--star-dim-mult:.3;}
 /* Подпись названной звезды — только во время "особого режима" (temp-элементы, см.
    enterStarSpecialMode/exitStarSpecialMode), маленьким текстом цвета звезды прямо под ней. */
+/* --star-name-shift — на случай, если звезда у самого края экрана: без сдвига (0px) подпись
+   просто центрируется над звездой, JS выставляет ненулевое значение только когда обнаруживает
+   реальный выход за левый/правый край (см. showNamedStarLabels в app.js). */
 .sky-star-name-label{
-  position:absolute; transform:translate(-50%, 10px); font-size:.7rem; font-weight:600;
-  white-space:nowrap; pointer-events:none;
+  position:absolute; transform:translate(calc(-50% + var(--star-name-shift, 0px)), 10px);
+  font-size:.7rem; font-weight:600; white-space:nowrap; pointer-events:none;
 }
 /* Попап называния звезды — не общий openModal (тот всегда по центру экрана), а свой оверлей:
    всегда по горизонтали в центре, по вертикали — над звездой или под ней, никогда не перекрывая
