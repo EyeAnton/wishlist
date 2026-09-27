@@ -416,6 +416,8 @@ function spawnTitleStarBurst(){
 // (см. toggleStarViewMode). Видна только владельцу текущего клика — у остальных гостей просто
 // тихо появляется звезда (см. watchBonusStars) без подписей.
 function showNamedStarLabels(){
+  const layer = $("#skyStars");
+  if(!layer) return;
   bonusStarsData.forEach(({ data }) => {
     if(!data.name) return;
     const label = document.createElement("span");
@@ -425,7 +427,17 @@ function showNamedStarLabels(){
     label.style.top = `${data.top}%`;
     label.style.color = `hsl(${data.hue},100%,70%)`;
     label.dataset.tempLabel = "1";
-    $("#skyStars")?.appendChild(label);
+    layer.appendChild(label);
+    // Название должно быть видно целиком, даже если звезда у самого края экрана (в том числе
+    // уже существующие звёзды, чьё сохранённое положение мы не трогаем) — после вставки в DOM
+    // проверяем реальные границы и, если вылезает за левый/правый край, сдвигаем по горизонтали
+    // через --star-name-shift (см. style.css), а не просто центрируем над звездой вслепую.
+    const rect = label.getBoundingClientRect();
+    const margin = 8;
+    let shiftPx = 0;
+    if(rect.left < margin) shiftPx = margin - rect.left;
+    else if(rect.right > window.innerWidth - margin) shiftPx = (window.innerWidth - margin) - rect.right;
+    if(shiftPx) label.style.setProperty("--star-name-shift", `${shiftPx.toFixed(1)}px`);
   });
 }
 
@@ -451,11 +463,14 @@ function exitStarSpecialMode(){
 // уходит на 30% непрозрачности ("прозрачный на 70%", но не исчезает целиком — остаётся видимым
 // и кликабельным, чтобы можно было так же кликом выйти), плюс подписи именованных звёзд (без
 // затемнения карточек — это не тот драматичный особый режим 9-го клика, а спокойный просмотр).
+// Тема/контакты/иконка подарка на это время полностью скрываются (см. .star-view-mode в
+// style.css) — ничего не должно отвлекать от неба, пока смотрим на свою звезду.
 let starViewModeActive = false;
 
 function toggleStarViewMode(){
   starViewModeActive = !starViewModeActive;
   const btn = $("#titleClickTarget");
+  document.body.classList.toggle("star-view-mode", starViewModeActive);
   if(starViewModeActive){
     if(btn) btn.style.opacity = "0.3";
     showNamedStarLabels();
@@ -632,7 +647,10 @@ function addBonusStar(){
   const data = {
     hue: Math.floor(Math.random() * 360),
     opacity: Number((0.8 + Math.random() * 0.2).toFixed(2)),
-    left: Number((Math.random() * 100).toFixed(2)),
+    // Отступ от левого/правого края — само название звезды шире одной точки, у самого края
+    // экрана его бы обрезало. Не панацея (звёзды смотрят разные экраны разной ширины), поэтому
+    // подпись всё равно подстраховывается на рендере (см. --star-name-shift в showNamedStarLabels).
+    left: Number((5 + Math.random() * 90).toFixed(2)),
     // Только верхняя треть экрана — ниже звезду вместе с попапом называния перекрывает
     // мобильная клавиатура, пока вводишь имя.
     top: Number((Math.random() * 33).toFixed(2)),
