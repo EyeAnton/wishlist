@@ -470,12 +470,12 @@ function hideNamedStarLabels(){
 // попап не закрыт (назвали звезду или погасили) — карточки товаров и календарь плавно уходят в
 // прозрачность, чтобы ничего не отвлекало от неба, плюс подписи звёзд (см. выше).
 function enterStarSpecialMode(){
-  document.body.classList.add("star-mode-dim");
+  document.body.classList.add("star-mode-dim", "star-view-mode");
   showNamedStarLabels();
 }
 
 function exitStarSpecialMode(){
-  document.body.classList.remove("star-mode-dim");
+  document.body.classList.remove("star-mode-dim", "star-view-mode");
   hideNamedStarLabels();
 }
 

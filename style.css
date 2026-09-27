@@ -186,12 +186,13 @@ body{
    (не только под .star-mode-dim), иначе не сыграет обратно при выходе из режима. */
 #main, #countdown{transition:opacity .5s ease;}
 body.star-mode-dim #main, body.star-mode-dim #countdown{opacity:0; pointer-events:none;}
-/* Режим "посмотреть свою звезду" (см. toggleStarViewMode в app.js, после того как пасхалка уже
-   разыграна) — тема, контакты и иконка подарка полностью убираются: ничего не должно отвлекать от
-   неба и подписей звёзд. visibility:hidden, а НЕ display:none — иконка подарка сидит внутри того
-   же flex-контейнера, что и текст заголовка (.topbar-title), и display:none выкинул бы её из
-   потока, сдвигая "Вишлист" влево на её место; visibility:hidden прячет, но место оставляет —
-   заголовок остаётся ровно там же. */
+/* Один и тот же "режим неба" что при первом зажигании (см. enterStarSpecialMode в app.js, 7-й
+   клик и попап называния), что при повторном просмотре своей звезды позже (см.
+   toggleStarViewMode) — тема, контакты и иконка подарка полностью убираются одинаково в обоих
+   случаях: ничего не должно отвлекать от неба и подписей звёзд. visibility:hidden, а НЕ
+   display:none — иконка подарка сидит внутри того же flex-контейнера, что и текст заголовка
+   (.topbar-title), и display:none выкинул бы её из потока, сдвигая "Вишлист" влево на её место;
+   visibility:hidden прячет, но место оставляет — заголовок остаётся ровно там же. */
 body.star-view-mode #themeToggle,
 body.star-view-mode #topContacts,
 body.star-view-mode .title-gift-icon{
