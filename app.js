@@ -965,26 +965,42 @@ function openFactEditModal(key){
 function openQuizEditModal(key){
   const existing = QUIZZES[key];
   const questions = existing && existing.questions
-    ? existing.questions.map(q => ({ question: q.question || "", options: [q.options?.[0] || "", q.options?.[1] || "", q.options?.[2] || ""], correctIndex: q.correctIndex || 0 }))
+    ? existing.questions.map(q => q.type === "guess"
+        ? { type: "guess", question: q.question || "", answerValue: typeof q.answerValue === "number" ? q.answerValue : 0, unit: q.unit || "" }
+        : { type: "mc", question: q.question || "", options: [q.options?.[0] || "", q.options?.[1] || "", q.options?.[2] || ""], correctIndex: q.correctIndex || 0 })
     : [];
   const [y, m, d] = key.split("-").map(Number);
 
   function questionRowHtml(q, i){
+    const isGuess = q.type === "guess";
     return `
       <div class="quiz-edit-question" data-qi="${i}">
         <div class="quiz-edit-question-head">
-          <span class="quiz-edit-question-num">Вопрос ${i + 1}</span>
+          <div class="quiz-edit-question-head-left">
+            <span class="quiz-edit-question-num">Вопрос ${i + 1}</span>
+            <div class="quiz-edit-type-toggle">
+              <button type="button" class="quiz-edit-type-btn ${!isGuess ? "is-active" : ""}" data-settype="mc" data-qi="${i}">Выбор из 3</button>
+              <button type="button" class="quiz-edit-type-btn ${isGuess ? "is-active" : ""}" data-settype="guess" data-qi="${i}">Угадай число</button>
+            </div>
+          </div>
           <button type="button" class="quiz-edit-remove-btn" data-remove="${i}" title="Удалить вопрос">✕</button>
         </div>
         <input type="text" class="quiz-edit-question-text" placeholder="Текст вопроса" value="${escapeHtml(q.question)}">
-        <div class="quiz-edit-options">
-          ${[0, 1, 2].map(oi => `
-            <label class="quiz-edit-option">
-              <input type="radio" name="quizCorrect_${i}" value="${oi}" ${q.correctIndex === oi ? "checked" : ""}>
-              <input type="text" class="quiz-edit-option-text" placeholder="Вариант ${oi + 1}" value="${escapeHtml(q.options[oi])}">
-            </label>
-          `).join("")}
-        </div>
+        ${isGuess ? `
+          <div class="quiz-edit-guess-row">
+            <input type="number" class="quiz-edit-guess-value" placeholder="Правильное число" value="${q.answerValue ?? ""}">
+            <input type="text" class="quiz-edit-guess-unit" placeholder="Единица (необязательно, напр. «чашек»)" value="${escapeHtml(q.unit || "")}">
+          </div>
+        ` : `
+          <div class="quiz-edit-options">
+            ${[0, 1, 2].map(oi => `
+              <label class="quiz-edit-option">
+                <input type="radio" name="quizCorrect_${i}" value="${oi}" ${q.correctIndex === oi ? "checked" : ""}>
+                <input type="text" class="quiz-edit-option-text" placeholder="Вариант ${oi + 1}" value="${escapeHtml(q.options[oi])}">
+              </label>
+            `).join("")}
+          </div>
+        `}
       </div>
     `;
   }
@@ -1019,9 +1035,16 @@ function openQuizEditModal(key){
         const i = Number(row.dataset.qi);
         if(!questions[i]) return;
         questions[i].question = row.querySelector(".quiz-edit-question-text").value;
-        questions[i].options = Array.from(row.querySelectorAll(".quiz-edit-option-text")).map(inp => inp.value);
-        const checked = row.querySelector("input[type=radio]:checked");
-        questions[i].correctIndex = checked ? Number(checked.value) : 0;
+        if(questions[i].type === "guess"){
+          const valInput = row.querySelector(".quiz-edit-guess-value");
+          const unitInput = row.querySelector(".quiz-edit-guess-unit");
+          questions[i].answerValue = valInput && valInput.value.trim() !== "" ? Number(valInput.value) : NaN;
+          questions[i].unit = unitInput ? unitInput.value : "";
+        }else{
+          questions[i].options = Array.from(row.querySelectorAll(".quiz-edit-option-text")).map(inp => inp.value);
+          const checked = row.querySelector("input[type=radio]:checked");
+          questions[i].correctIndex = checked ? Number(checked.value) : 0;
+        }
       });
     }
 
@@ -1030,6 +1053,18 @@ function openQuizEditModal(key){
         btn.addEventListener("click", () => {
           readFormIntoState();
           questions.splice(Number(btn.dataset.remove), 1);
+          rerender();
+        });
+      });
+      listEl.querySelectorAll(".quiz-edit-type-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          readFormIntoState();
+          const i = Number(btn.dataset.qi);
+          const newType = btn.dataset.settype;
+          if(questions[i].type === newType) return;
+          questions[i] = newType === "guess"
+            ? { type: "guess", question: questions[i].question, answerValue: 0, unit: "" }
+            : { type: "mc", question: questions[i].question, options: ["", "", ""], correctIndex: 0 };
           rerender();
         });
       });
@@ -1043,7 +1078,7 @@ function openQuizEditModal(key){
 
     overlay.querySelector("#quizAddQuestionBtn").addEventListener("click", () => {
       readFormIntoState();
-      questions.push({ question: "", options: ["", "", ""], correctIndex: 0 });
+      questions.push({ type: "mc", question: "", options: ["", "", ""], correctIndex: 0 });
       rerender();
     });
 
@@ -1064,8 +1099,17 @@ function openQuizEditModal(key){
         return;
       }
       for(const q of questions){
-        if(!q.question.trim() || q.options.some(o => !o.trim())){
-          errEl.textContent = "Заполните текст вопроса и все 3 варианта ответа для каждого вопроса";
+        if(!q.question.trim()){
+          errEl.textContent = "Заполните текст вопроса для каждого вопроса";
+          return;
+        }
+        if(q.type === "guess"){
+          if(Number.isNaN(q.answerValue)){
+            errEl.textContent = "Укажите правильное число для вопроса-угадайки";
+            return;
+          }
+        }else if(q.options.some(o => !o.trim())){
+          errEl.textContent = "Заполните все 3 варианта ответа для каждого вопроса с выбором";
           return;
         }
       }
@@ -1073,7 +1117,9 @@ function openQuizEditModal(key){
       const congratsText = overlay.querySelector("#quizCongratsText").value.trim() || "Спасибо, что так хорошо меня знаешь! 🎉";
       await withLoadingButton(overlay.querySelector("#quizSaveBtn"), async () => {
         await set(quizRef(key), {
-          questions: questions.map(q => ({ question: q.question.trim(), options: q.options.map(o => o.trim()), correctIndex: q.correctIndex })),
+          questions: questions.map(q => q.type === "guess"
+            ? { type: "guess", question: q.question.trim(), answerValue: q.answerValue, unit: (q.unit || "").trim() }
+            : { type: "mc", question: q.question.trim(), options: q.options.map(o => o.trim()), correctIndex: q.correctIndex }),
           congratsText,
         });
         closeModal();
@@ -1106,6 +1152,7 @@ function openQuizModal(key){
 
   function renderQuestion(overlay){
     const q = questions[qi];
+    const isGuess = q.type === "guess";
     const body = overlay.querySelector(".modal");
     body.innerHTML = `
       <div class="fact-popup-header">
@@ -1118,42 +1165,83 @@ function openQuizModal(key){
       </div>
       <div class="quiz-progress">Вопрос ${qi + 1} из ${questions.length} · Очки: ${score}</div>
       <div class="quiz-question">${escapeHtml(q.question)}</div>
-      <div class="quiz-options" id="quizOptions">
-        ${q.options.map((opt, oi) => `<button type="button" class="quiz-option-btn" data-oi="${oi}">${escapeHtml(opt)}</button>`).join("")}
-      </div>
+      ${isGuess ? `
+        <div class="quiz-guess-row" id="quizGuessRow">
+          <input type="number" id="quizGuessInput" class="quiz-guess-input" placeholder="Число" inputmode="numeric">
+          <button type="button" id="quizGuessSubmit">Ответить</button>
+        </div>
+        <div class="quiz-guess-feedback" id="quizGuessFeedback"></div>
+      ` : `
+        <div class="quiz-options" id="quizOptions">
+          ${q.options.map((opt, oi) => `<button type="button" class="quiz-option-btn" data-oi="${oi}">${escapeHtml(opt)}</button>`).join("")}
+        </div>
+      `}
       <canvas class="quiz-confetti"></canvas>
     `;
     answered = false;
     body.querySelector("#quizCloseX").addEventListener("click", closeModal);
-    const optionsEl = body.querySelector("#quizOptions");
-    optionsEl.querySelectorAll(".quiz-option-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
+
+    // Общий хвост и для угадайки, и для выбора варианта: засчитать очко, конфетти, кнопка
+    // "дальше"/"узнать результат" сразу под вопросом (anchorEl — за что зацепить кнопку).
+    function finish(correct, anchorEl){
+      if(correct) score++;
+      if(correct) launchConfetti(body.querySelector(".quiz-confetti"));
+      const actions = document.createElement("div");
+      actions.className = "modal-actions modal-actions-center";
+      const nextBtn = document.createElement("button");
+      nextBtn.id = "quizNextBtn";
+      nextBtn.textContent = qi + 1 < questions.length ? "Дальше →" : "Узнать результат";
+      actions.appendChild(nextBtn);
+      anchorEl.insertAdjacentElement("afterend", actions);
+      nextBtn.addEventListener("click", () => {
+        qi++;
+        if(qi < questions.length) renderQuestion(overlay);
+        else renderResult(overlay);
+      });
+    }
+
+    if(isGuess){
+      const guessInput = body.querySelector("#quizGuessInput");
+      const submitBtn = body.querySelector("#quizGuessSubmit");
+      const feedbackEl = body.querySelector("#quizGuessFeedback");
+      const submitGuess = () => {
         if(answered) return;
+        if(guessInput.value.trim() === "" || Number.isNaN(Number(guessInput.value))) return;
         answered = true;
-        const oi = Number(btn.dataset.oi);
-        const correct = oi === q.correctIndex;
-        if(correct) score++;
-        optionsEl.querySelectorAll(".quiz-option-btn").forEach(b => {
-          const boi = Number(b.dataset.oi);
-          if(boi === q.correctIndex) b.classList.add("is-correct");
-          else if(boi === oi) b.classList.add("is-wrong");
-          b.disabled = true;
-        });
-        if(correct) launchConfetti(body.querySelector(".quiz-confetti"));
-        const actions = document.createElement("div");
-        actions.className = "modal-actions modal-actions-center";
-        const nextBtn = document.createElement("button");
-        nextBtn.id = "quizNextBtn";
-        nextBtn.textContent = qi + 1 < questions.length ? "Дальше →" : "Узнать результат";
-        actions.appendChild(nextBtn);
-        body.querySelector(".quiz-options").insertAdjacentElement("afterend", actions);
-        nextBtn.addEventListener("click", () => {
-          qi++;
-          if(qi < questions.length) renderQuestion(overlay);
-          else renderResult(overlay);
+        const val = Number(guessInput.value);
+        guessInput.disabled = true;
+        submitBtn.disabled = true;
+        const answerValue = q.answerValue;
+        const diff = Math.abs(val - answerValue);
+        const tolerance = Math.max(1, Math.round(Math.abs(answerValue) * 0.15));
+        const correct = diff <= tolerance;
+        const unit = q.unit ? " " + q.unit : "";
+        if(diff === 0) feedbackEl.textContent = `Точно в яблочко! Ответ: ${answerValue}${unit}`;
+        else if(correct) feedbackEl.textContent = `Совсем близко! Ты сказал ${val}${unit}, точный ответ — ${answerValue}${unit}.`;
+        else feedbackEl.textContent = `Мимо! На самом деле ${val < answerValue ? "больше" : "меньше"}: ${answerValue}${unit} (ты сказал ${val}${unit}).`;
+        feedbackEl.classList.add(correct ? "is-correct" : "is-wrong");
+        finish(correct, feedbackEl);
+      };
+      submitBtn.addEventListener("click", submitGuess);
+      guessInput.addEventListener("keydown", e => { if(e.key === "Enter") submitGuess(); });
+    }else{
+      const optionsEl = body.querySelector("#quizOptions");
+      optionsEl.querySelectorAll(".quiz-option-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          if(answered) return;
+          answered = true;
+          const oi = Number(btn.dataset.oi);
+          const correct = oi === q.correctIndex;
+          optionsEl.querySelectorAll(".quiz-option-btn").forEach(b => {
+            const boi = Number(b.dataset.oi);
+            if(boi === q.correctIndex) b.classList.add("is-correct");
+            else if(boi === oi) b.classList.add("is-wrong");
+            b.disabled = true;
+          });
+          finish(correct, optionsEl);
         });
       });
-    });
+    }
   }
 
   function renderResult(overlay){
