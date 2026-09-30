@@ -523,6 +523,33 @@ header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; g
   background-color:var(--input-bg); color:var(--text);
 }
 #quizAddQuestionBtn{margin-bottom:4px;}
+.quiz-edit-question-head{justify-content:space-between;}
+.quiz-edit-question-head-left{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+.quiz-edit-type-toggle{display:flex; gap:4px;}
+.quiz-edit-type-btn{padding:4px 9px; font-size:.78rem; background:var(--input-bg); color:var(--muted); border-radius:6px;}
+.quiz-edit-type-btn.is-active{background:var(--accent-solid); color:#fff;}
+.quiz-edit-guess-row{display:flex; gap:8px;}
+.quiz-edit-guess-value{
+  width:130px; flex:none; padding:7px 10px; border:1px solid var(--border); border-radius:8px; font:inherit;
+  background-color:var(--input-bg); color:var(--text);
+}
+.quiz-edit-guess-unit{
+  flex:1; padding:7px 10px; border:1px solid var(--border); border-radius:8px; font:inherit;
+  background-color:var(--input-bg); color:var(--text);
+}
+/* Гостевой квиз: вариант "угадай число" — поле ввода + кнопка вместо трёх кнопок-вариантов,
+   после ответа под полем показываем текстовую обратную связь (точно / близко / мимо). */
+.quiz-guess-row{display:flex; gap:8px; margin-bottom:10px;}
+.quiz-guess-input{
+  flex:1; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font:inherit;
+  background-color:var(--input-bg); color:var(--text);
+}
+.quiz-guess-feedback{
+  font-size:.92rem; line-height:1.4; padding:10px 12px; border-radius:8px; background:var(--card);
+  color:var(--text); min-height:1em;
+}
+.quiz-guess-feedback.is-correct{background:var(--ok); color:#fff;}
+.quiz-guess-feedback.is-wrong{background:var(--danger); color:#fff;}
 
 /* тумблер темы: скруглённый прямоугольник + кружок, который едет по клику.
    Солнце и луна нарисованы векторно и лежат по краям трека — тумблер-кружок
