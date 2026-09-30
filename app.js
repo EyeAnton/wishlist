@@ -745,6 +745,11 @@ const DEFAULT_DAILY_FACTS = {
 };
 let DAILY_FACTS = { ...DEFAULT_DAILY_FACTS };
 
+// Квиз на конкретный день — отдельный узел в базе (facts/{key} и quizzes/{key} не пересекаются),
+// чтобы не городить в одном факте два разных формата. Если для дня есть квиз — гость вместо
+// обычного факта играет в него (см. renderCountdown), а факт остаётся в базе про запас.
+let QUIZZES = {};
+
 function dateKey(d){
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
@@ -794,7 +799,8 @@ function renderCountdown(){
     const isPastStrict = d.getTime() < today.getTime();
     const canView = d.getTime() <= today.getTime();
     const key = dateKey(d);
-    const clickable = canEditFacts || (canView && DAILY_FACTS[key]);
+    const hasQuiz = !!(QUIZZES[key] && QUIZZES[key].questions && QUIZZES[key].questions.length);
+    const clickable = canEditFacts || (canView && (DAILY_FACTS[key] || hasQuiz));
     const tilted = isPastStrict || (isToday && todayFactRead);
     const dayContent = isTarget
       ? `<span class="calendar-cell-confetti">🎉</span><span class="calendar-cell-daynum">${d.getDate()}</span>`
@@ -816,8 +822,10 @@ function renderCountdown(){
 
   el.querySelectorAll(".calendar-cell[data-fact-date]").forEach(cell => {
     cell.addEventListener("click", () => {
-      if(canEditFacts) openFactEditModal(cell.dataset.factDate);
-      else openFactModal(cell.dataset.factDate);
+      const key = cell.dataset.factDate;
+      const hasQuiz = !!(QUIZZES[key] && QUIZZES[key].questions && QUIZZES[key].questions.length);
+      if(canEditFacts) hasQuiz ? openQuizEditModal(key) : openFactEditModal(key);
+      else hasQuiz ? openQuizModal(key) : openFactModal(key);
     });
   });
 }
@@ -877,10 +885,12 @@ function openFactEditModal(key){
     <div class="error-text" id="factEditError"></div>
     <div class="modal-actions">
       ${html ? '<button class="danger left" id="factDeleteBtn">Удалить</button>' : ""}
+      <button class="secondary" id="factQuizModeBtn">🎮 Сделать квиз вместо факта</button>
       <button class="secondary" id="factCancelBtn">Отмена</button>
       <button id="factSaveBtn">Сохранить</button>
     </div>
   `, overlay => {
+    overlay.querySelector("#factQuizModeBtn").addEventListener("click", () => openQuizEditModal(key));
     const editor = overlay.querySelector("#factText");
     try{ document.execCommand("defaultParagraphSeparator", false, "p"); }catch(e){ /* старые браузеры просто продолжат с div */ }
     editor.focus();
@@ -948,6 +958,225 @@ function openFactEditModal(key){
   }, { closeOnBackdrop: true });
 }
 
+// Админ-редактор квиза на день: список вопросов (текст + 3 варианта + отметка правильного) и
+// текст поздравления в конце игры. "Вернуть обычный факт" удаляет квиз — тогда для этого дня
+// снова открывается обычный факт (см. renderCountdown: клетка ведёт на квиз только пока для
+// неё есть quizzes/{key} с непустым списком вопросов).
+function openQuizEditModal(key){
+  const existing = QUIZZES[key];
+  const questions = existing && existing.questions
+    ? existing.questions.map(q => ({ question: q.question || "", options: [q.options?.[0] || "", q.options?.[1] || "", q.options?.[2] || ""], correctIndex: q.correctIndex || 0 }))
+    : [];
+  const [y, m, d] = key.split("-").map(Number);
+
+  function questionRowHtml(q, i){
+    return `
+      <div class="quiz-edit-question" data-qi="${i}">
+        <div class="quiz-edit-question-head">
+          <span class="quiz-edit-question-num">Вопрос ${i + 1}</span>
+          <button type="button" class="quiz-edit-remove-btn" data-remove="${i}" title="Удалить вопрос">✕</button>
+        </div>
+        <input type="text" class="quiz-edit-question-text" placeholder="Текст вопроса" value="${escapeHtml(q.question)}">
+        <div class="quiz-edit-options">
+          ${[0, 1, 2].map(oi => `
+            <label class="quiz-edit-option">
+              <input type="radio" name="quizCorrect_${i}" value="${oi}" ${q.correctIndex === oi ? "checked" : ""}>
+              <input type="text" class="quiz-edit-option-text" placeholder="Вариант ${oi + 1}" value="${escapeHtml(q.options[oi])}">
+            </label>
+          `).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  openModal(`
+    <div class="fact-popup-header">
+      <div class="calendar-cell">
+        <div class="calendar-cell-dow">${MONTH_SHORT[m - 1]}</div>
+        <div class="calendar-cell-day">${d}</div>
+      </div>
+      <div class="fact-popup-title">Квиз на этот день</div>
+    </div>
+    <div id="quizEditQuestions">${questions.map(questionRowHtml).join("")}</div>
+    <button type="button" class="secondary" id="quizAddQuestionBtn">+ Добавить вопрос</button>
+    <div class="field" style="margin-top:16px;">
+      <label>Текст поздравления в конце игры</label>
+      <textarea id="quizCongratsText" rows="2">${escapeHtml((existing && existing.congratsText) || "Спасибо, что так хорошо меня знаешь! 🎉")}</textarea>
+    </div>
+    <div class="error-text" id="quizEditError"></div>
+    <div class="modal-actions">
+      ${existing ? '<button class="danger left" id="quizDeleteBtn">Вернуть обычный факт</button>' : ""}
+      <button class="secondary" id="quizCancelBtn">Отмена</button>
+      <button id="quizSaveBtn">Сохранить</button>
+    </div>
+  `, overlay => {
+    const listEl = overlay.querySelector("#quizEditQuestions");
+
+    // Считываем текущие значения полей ДО перерисовки списка (например, перед удалением
+    // вопроса), чтобы не потерять то, что уже ввели в остальных вопросах.
+    function readFormIntoState(){
+      listEl.querySelectorAll(".quiz-edit-question").forEach(row => {
+        const i = Number(row.dataset.qi);
+        if(!questions[i]) return;
+        questions[i].question = row.querySelector(".quiz-edit-question-text").value;
+        questions[i].options = Array.from(row.querySelectorAll(".quiz-edit-option-text")).map(inp => inp.value);
+        const checked = row.querySelector("input[type=radio]:checked");
+        questions[i].correctIndex = checked ? Number(checked.value) : 0;
+      });
+    }
+
+    function wireRows(){
+      listEl.querySelectorAll(".quiz-edit-remove-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          readFormIntoState();
+          questions.splice(Number(btn.dataset.remove), 1);
+          rerender();
+        });
+      });
+    }
+
+    function rerender(){
+      listEl.innerHTML = questions.map(questionRowHtml).join("");
+      wireRows();
+    }
+    wireRows();
+
+    overlay.querySelector("#quizAddQuestionBtn").addEventListener("click", () => {
+      readFormIntoState();
+      questions.push({ question: "", options: ["", "", ""], correctIndex: 0 });
+      rerender();
+    });
+
+    overlay.querySelector("#quizCancelBtn").addEventListener("click", closeModal);
+    overlay.querySelector("#quizDeleteBtn")?.addEventListener("click", async () => {
+      if(!confirm("Удалить квиз на этот день и вернуть обычный факт?")) return;
+      await withLoadingButton(overlay.querySelector("#quizDeleteBtn"), async () => {
+        await remove(quizRef(key));
+        closeModal();
+        showToast("Квиз удалён");
+      });
+    });
+    overlay.querySelector("#quizSaveBtn").addEventListener("click", async () => {
+      readFormIntoState();
+      const errEl = overlay.querySelector("#quizEditError");
+      if(!questions.length){
+        errEl.textContent = "Добавьте хотя бы один вопрос";
+        return;
+      }
+      for(const q of questions){
+        if(!q.question.trim() || q.options.some(o => !o.trim())){
+          errEl.textContent = "Заполните текст вопроса и все 3 варианта ответа для каждого вопроса";
+          return;
+        }
+      }
+      errEl.textContent = "";
+      const congratsText = overlay.querySelector("#quizCongratsText").value.trim() || "Спасибо, что так хорошо меня знаешь! 🎉";
+      await withLoadingButton(overlay.querySelector("#quizSaveBtn"), async () => {
+        await set(quizRef(key), {
+          questions: questions.map(q => ({ question: q.question.trim(), options: q.options.map(o => o.trim()), correctIndex: q.correctIndex })),
+          congratsText,
+        });
+        closeModal();
+        showToast("Квиз сохранён");
+      });
+    });
+  }, { closeOnBackdrop: true, wide: true });
+}
+
+// Гостевой квиз: по одному вопросу за раз, 3 варианта ответа. При ЛЮБОМ ответе (верном или нет)
+// сразу подсвечиваем правильный вариант зелёным, прежде чем дать перейти к следующему вопросу —
+// так требовал Антон явно. Счёт не сохраняется между визитами (каждый раз заново), порядок
+// вопросов фиксированный (без перемешивания).
+function openQuizModal(key){
+  const quiz = QUIZZES[key];
+  if(!quiz || !quiz.questions || !quiz.questions.length) return;
+  const questions = quiz.questions;
+  const [y, m, d] = key.split("-").map(Number);
+
+  const now = new Date();
+  const todayKey = dateKey(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
+  if(key === todayKey && localStorage.getItem(LS.factReadDate) !== todayKey){
+    localStorage.setItem(LS.factReadDate, todayKey);
+    renderCountdown();
+  }
+
+  let qi = 0;
+  let score = 0;
+  let answered = false;
+
+  function renderQuestion(overlay){
+    const q = questions[qi];
+    const body = overlay.querySelector(".modal");
+    body.innerHTML = `
+      <div class="fact-popup-header">
+        <div class="calendar-cell">
+          <div class="calendar-cell-dow">${MONTH_SHORT[m - 1]}</div>
+          <div class="calendar-cell-day">${d}</div>
+        </div>
+        <div class="fact-popup-title">Угадай факт обо мне!</div>
+        <button type="button" class="ghost icon-btn quiz-close-x" id="quizCloseX" title="Закрыть" aria-label="Закрыть">✕</button>
+      </div>
+      <div class="quiz-progress">Вопрос ${qi + 1} из ${questions.length} · Очки: ${score}</div>
+      <div class="quiz-question">${escapeHtml(q.question)}</div>
+      <div class="quiz-options" id="quizOptions">
+        ${q.options.map((opt, oi) => `<button type="button" class="quiz-option-btn" data-oi="${oi}">${escapeHtml(opt)}</button>`).join("")}
+      </div>
+      <canvas class="quiz-confetti"></canvas>
+    `;
+    answered = false;
+    body.querySelector("#quizCloseX").addEventListener("click", closeModal);
+    const optionsEl = body.querySelector("#quizOptions");
+    optionsEl.querySelectorAll(".quiz-option-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        if(answered) return;
+        answered = true;
+        const oi = Number(btn.dataset.oi);
+        const correct = oi === q.correctIndex;
+        if(correct) score++;
+        optionsEl.querySelectorAll(".quiz-option-btn").forEach(b => {
+          const boi = Number(b.dataset.oi);
+          if(boi === q.correctIndex) b.classList.add("is-correct");
+          else if(boi === oi) b.classList.add("is-wrong");
+          b.disabled = true;
+        });
+        if(correct) launchConfetti(body.querySelector(".quiz-confetti"));
+        const actions = document.createElement("div");
+        actions.className = "modal-actions modal-actions-center";
+        const nextBtn = document.createElement("button");
+        nextBtn.id = "quizNextBtn";
+        nextBtn.textContent = qi + 1 < questions.length ? "Дальше →" : "Узнать результат";
+        actions.appendChild(nextBtn);
+        body.querySelector(".quiz-options").insertAdjacentElement("afterend", actions);
+        nextBtn.addEventListener("click", () => {
+          qi++;
+          if(qi < questions.length) renderQuestion(overlay);
+          else renderResult(overlay);
+        });
+      });
+    });
+  }
+
+  function renderResult(overlay){
+    const body = overlay.querySelector(".modal");
+    body.innerHTML = `
+      <div class="quiz-result">
+        <div class="quiz-result-score">${score} / ${questions.length}</div>
+        <p class="quiz-result-congrats">${escapeHtml(quiz.congratsText || "Спасибо, что так хорошо меня знаешь! 🎉")}</p>
+        <div class="modal-actions modal-actions-center">
+          <button id="quizCloseBtn">Закрыть</button>
+        </div>
+      </div>
+      <canvas class="quiz-confetti"></canvas>
+    `;
+    launchConfetti(body.querySelector(".quiz-confetti"));
+    body.querySelector("#quizCloseBtn").addEventListener("click", closeModal);
+  }
+
+  openModal(`<div class="quiz-modal-placeholder"></div>`, overlay => {
+    renderQuestion(overlay);
+  }, { closeOnBackdrop: false, wide: true });
+}
+
 // Клетка нового факта слегка покачивается и показывает короткую подсказку над собой — вместо
 // того чтобы сразу открывать попап (это уже интрузивно на каждый день), просто привлекаем
 // внимание, а сам факт гость открывает кликом, как и все остальные прошедшие дни.
@@ -977,7 +1206,8 @@ function maybeShowDailyFact(){
   const target = getBirthdayTarget(today);
   const latestOpened = today < target ? today : target;
   const key = dateKey(latestOpened);
-  if(!DAILY_FACTS[key]) return;
+  const hasQuiz = !!(QUIZZES[key] && QUIZZES[key].questions && QUIZZES[key].questions.length);
+  if(!DAILY_FACTS[key] && !hasQuiz) return;
   if(localStorage.getItem(LS.dailyFactSeen) === key) return;
   highlightNewFactCell(key);
   localStorage.setItem(LS.dailyFactSeen, key);
@@ -1086,6 +1316,10 @@ function itemRef(id){
 
 function factRef(key){
   return ref(db, "facts/" + key);
+}
+
+function quizRef(key){
+  return ref(db, "quizzes/" + key);
 }
 
 // ====== "УМНОЕ" ЗАПОЛНЕНИЕ ПО ССЫЛКЕ ======
@@ -2230,6 +2464,14 @@ function watchFacts(){
   });
 }
 
+function watchQuizzes(){
+  if(!db) return;
+  onValue(ref(db, "quizzes"), snap => {
+    QUIZZES = snap.val() || {};
+    renderCountdown();
+  }, () => {});
+}
+
 // ====== СТАРТ ======
 export function initApp(opts){
   IS_ADMIN = !!(opts && opts.isAdmin);
@@ -2255,6 +2497,7 @@ export function initApp(opts){
   }
   watchItems();
   watchFacts();
+  watchQuizzes();
   watchBonusStars();
   loadRates();
 }
