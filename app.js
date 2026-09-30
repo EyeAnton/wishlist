@@ -466,17 +466,51 @@ function hideNamedStarLabels(){
   document.querySelectorAll('.sky-star-name-label[data-temp-label="1"]').forEach(el => el.remove());
 }
 
+// Звёздный режим концептуально ночной (звёздное небо, подписи звёзд) — если оставить тему как
+// есть, в светлой теме получается визуальный разнобой: контент прячется, а фон под ним и тёмная
+// подложка попапа выглядят как ночь, хотя [data-theme] всё ещё "light" (и переключатель темы
+// по-прежнему показывает солнце). Вместо этого реально переключаем тему на тёмную на время
+// режима — тем же путём, что и ручной клик по переключателю (applyTheme + поворот --sky-spin),
+// только БЕЗ записи в LS.theme, чтобы не подменить сохранённое предпочтение пользователя. Ничего
+// не делаем, если уже и так тёмная тема — рестор в этом случае тоже не нужен (starModeThemeForced
+// остаётся false).
+let starModeThemeForced = false;
+let starModeThemePrev = null;
+
+function forceDarkForStarMode(){
+  if(starModeThemeForced) return;
+  const root = document.documentElement;
+  const isDark = root.getAttribute("data-theme") === "dark"
+    || (root.getAttribute("data-theme") !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  if(isDark) return;
+  starModeThemeForced = true;
+  starModeThemePrev = root.getAttribute("data-theme");
+  applyTheme("dark");
+  skySpin += 180;
+  $(".sky-orbit")?.style.setProperty("--sky-spin", skySpin);
+}
+
+function restoreThemeAfterStarMode(){
+  if(!starModeThemeForced) return;
+  starModeThemeForced = false;
+  applyTheme(starModeThemePrev);
+  skySpin += 180;
+  $(".sky-orbit")?.style.setProperty("--sky-spin", skySpin);
+}
+
 // "Особый режим": с 9-го клика (звездопад + зажигание + попап называния) и до тех пор, пока
 // попап не закрыт (назвали звезду или погасили) — карточки товаров и календарь плавно уходят в
 // прозрачность, чтобы ничего не отвлекало от неба, плюс подписи звёзд (см. выше).
 function enterStarSpecialMode(){
   document.body.classList.add("star-mode-dim", "star-view-mode");
   showNamedStarLabels();
+  forceDarkForStarMode();
 }
 
 function exitStarSpecialMode(){
   document.body.classList.remove("star-mode-dim", "star-view-mode");
   hideNamedStarLabels();
+  restoreThemeAfterStarMode();
 }
 
 // После того как пасхалка уже разыграна (titleEasterEggLocked), заголовок не становится совсем
@@ -498,9 +532,11 @@ function toggleStarViewMode(){
   if(starViewModeActive){
     if(btn) btn.style.opacity = "0.3";
     showNamedStarLabels();
+    forceDarkForStarMode();
   }else{
     if(btn) btn.style.opacity = "";
     hideNamedStarLabels();
+    restoreThemeAfterStarMode();
   }
 }
 
