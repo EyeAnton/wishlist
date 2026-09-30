@@ -487,6 +487,43 @@ header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; g
 }
 .rt-toolbar button:hover{background:var(--accent-solid); color:#fff;}
 
+/* Гостевой квиз (день рождения): прогресс + вопрос + 3 варианта ответа кнопками на всю ширину. */
+.quiz-close-x{margin-left:auto; flex:none;}
+.quiz-progress{color:var(--muted); font-size:.82rem; margin-bottom:10px;}
+.quiz-question{color:var(--text); font-weight:700; font-size:1.05rem; line-height:1.35; margin-bottom:16px;}
+.quiz-options{display:flex; flex-direction:column; gap:9px;}
+.quiz-option-btn{
+  width:100%; text-align:left; background:var(--card); color:var(--text); border:1px solid var(--border);
+}
+.quiz-option-btn:hover:not(:disabled){background:var(--input-bg);}
+.quiz-option-btn.is-correct{background:var(--ok); color:#fff; border-color:var(--ok); opacity:1;}
+.quiz-option-btn.is-wrong{background:var(--danger); color:#fff; border-color:var(--danger); opacity:1;}
+.quiz-option-btn:disabled{cursor:default;}
+.quiz-confetti{position:fixed; inset:0; pointer-events:none; z-index:1;}
+.quiz-result{position:relative; z-index:2; text-align:center; padding:12px 0;}
+.quiz-result-score{font-size:2.4rem; font-weight:700; color:var(--accent-solid); margin-bottom:10px;}
+.quiz-result-congrats{color:var(--text); line-height:1.5; margin:0;}
+/* Админ-редактор квиза: одна карточка на вопрос, радио слева от каждого варианта отмечает верный. */
+.quiz-edit-question{
+  border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:12px; background:var(--card);
+}
+.quiz-edit-question-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;}
+.quiz-edit-question-num{font-weight:700; font-size:.85rem; color:var(--muted);}
+.quiz-edit-remove-btn{background:transparent; color:var(--muted); padding:2px 8px; border-radius:6px;}
+.quiz-edit-remove-btn:hover{background:var(--danger); color:#fff;}
+.quiz-edit-question-text{
+  width:100%; padding:9px 11px; border:1px solid var(--border); border-radius:8px; font:inherit;
+  background-color:var(--input-bg); color:var(--text); margin-bottom:8px;
+}
+.quiz-edit-options{display:flex; flex-direction:column; gap:6px;}
+.quiz-edit-option{display:flex; align-items:center; gap:8px;}
+.quiz-edit-option input[type="radio"]{flex:none; accent-color:var(--ok); width:16px; height:16px;}
+.quiz-edit-option-text{
+  flex:1; padding:7px 10px; border:1px solid var(--border); border-radius:8px; font:inherit;
+  background-color:var(--input-bg); color:var(--text);
+}
+#quizAddQuestionBtn{margin-bottom:4px;}
+
 /* тумблер темы: скруглённый прямоугольник + кружок, который едет по клику.
    Солнце и луна нарисованы векторно и лежат по краям трека — тумблер-кружок
    наезжает на одну из них, скрывая её, в зависимости от текущей темы. */
