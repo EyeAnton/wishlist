@@ -1002,10 +1002,11 @@ function openQuizEditModal(key){
   const existing = QUIZZES[key];
   const questions = existing && existing.questions
     ? existing.questions.map(q => q.type === "guess"
-        ? { type: "guess", question: q.question || "", answerValue: typeof q.answerValue === "number" ? q.answerValue : 0, unit: q.unit || "" }
-        : { type: "mc", question: q.question || "", options: [q.options?.[0] || "", q.options?.[1] || "", q.options?.[2] || ""], correctIndex: q.correctIndex || 0 })
+        ? { type: "guess", question: q.question || "", answerValue: typeof q.answerValue === "number" ? q.answerValue : 0, unit: q.unit || "", factDate: q.factDate || "" }
+        : { type: "mc", question: q.question || "", options: [q.options?.[0] || "", q.options?.[1] || "", q.options?.[2] || ""], correctIndex: q.correctIndex || 0, factDate: q.factDate || "" })
     : [];
   const [y, m, d] = key.split("-").map(Number);
+  const factDateOptions = Object.keys(DAILY_FACTS).sort();
 
   function questionRowHtml(q, i){
     const isGuess = q.type === "guess";
@@ -1022,6 +1023,13 @@ function openQuizEditModal(key){
           <button type="button" class="quiz-edit-remove-btn" data-remove="${i}" title="Удалить вопрос">✕</button>
         </div>
         <input type="text" class="quiz-edit-question-text" placeholder="Текст вопроса" value="${escapeHtml(q.question)}">
+        <select class="quiz-edit-fact-select" title="Факт, который можно посмотреть после ответа">
+          <option value="">— без кнопки "Узнать факт" —</option>
+          ${factDateOptions.map(fd => {
+            const [fy, fm, fd2] = fd.split("-").map(Number);
+            return `<option value="${fd}" ${q.factDate === fd ? "selected" : ""}>${fd2} ${MONTH_SHORT[fm - 1]}</option>`;
+          }).join("")}
+        </select>
         ${isGuess ? `
           <div class="quiz-edit-guess-row">
             <input type="number" class="quiz-edit-guess-value" placeholder="Правильное число" value="${q.answerValue ?? ""}">
@@ -1071,6 +1079,7 @@ function openQuizEditModal(key){
         const i = Number(row.dataset.qi);
         if(!questions[i]) return;
         questions[i].question = row.querySelector(".quiz-edit-question-text").value;
+        questions[i].factDate = row.querySelector(".quiz-edit-fact-select").value;
         if(questions[i].type === "guess"){
           const valInput = row.querySelector(".quiz-edit-guess-value");
           const unitInput = row.querySelector(".quiz-edit-guess-unit");
@@ -1099,8 +1108,8 @@ function openQuizEditModal(key){
           const newType = btn.dataset.settype;
           if(questions[i].type === newType) return;
           questions[i] = newType === "guess"
-            ? { type: "guess", question: questions[i].question, answerValue: 0, unit: "" }
-            : { type: "mc", question: questions[i].question, options: ["", "", ""], correctIndex: 0 };
+            ? { type: "guess", question: questions[i].question, answerValue: 0, unit: "", factDate: questions[i].factDate }
+            : { type: "mc", question: questions[i].question, options: ["", "", ""], correctIndex: 0, factDate: questions[i].factDate };
           rerender();
         });
       });
@@ -1114,7 +1123,7 @@ function openQuizEditModal(key){
 
     overlay.querySelector("#quizAddQuestionBtn").addEventListener("click", () => {
       readFormIntoState();
-      questions.push({ type: "mc", question: "", options: ["", "", ""], correctIndex: 0 });
+      questions.push({ type: "mc", question: "", options: ["", "", ""], correctIndex: 0, factDate: "" });
       rerender();
     });
 
@@ -1154,8 +1163,8 @@ function openQuizEditModal(key){
       await withLoadingButton(overlay.querySelector("#quizSaveBtn"), async () => {
         await set(quizRef(key), {
           questions: questions.map(q => q.type === "guess"
-            ? { type: "guess", question: q.question.trim(), answerValue: q.answerValue, unit: (q.unit || "").trim() }
-            : { type: "mc", question: q.question.trim(), options: q.options.map(o => o.trim()), correctIndex: q.correctIndex }),
+            ? { type: "guess", question: q.question.trim(), answerValue: q.answerValue, unit: (q.unit || "").trim(), factDate: q.factDate || null }
+            : { type: "mc", question: q.question.trim(), options: q.options.map(o => o.trim()), correctIndex: q.correctIndex, factDate: q.factDate || null }),
           congratsText,
         });
         closeModal();
@@ -1218,12 +1227,22 @@ function openQuizModal(key){
     body.querySelector("#quizCloseX").addEventListener("click", closeModal);
 
     // Общий хвост и для угадайки, и для выбора варианта: засчитать очко, конфетти, кнопка
+    // "узнать факт" (если у вопроса привязан факт — открывается ПОВЕРХ квиза отдельным
+    // всплывающим окном, см. showQuizFactPopup, не трогая сам квиз) и кнопка
     // "дальше"/"узнать результат" сразу под вопросом (anchorEl — за что зацепить кнопку).
     function finish(correct, anchorEl){
       if(correct) score++;
       if(correct) launchConfetti(body.querySelector(".quiz-confetti"));
       const actions = document.createElement("div");
       actions.className = "modal-actions modal-actions-center";
+      if(q.factDate && DAILY_FACTS[q.factDate]){
+        const factBtn = document.createElement("button");
+        factBtn.type = "button";
+        factBtn.className = "secondary";
+        factBtn.textContent = "📖 Узнать факт";
+        factBtn.addEventListener("click", () => showQuizFactPopup(q.factDate));
+        actions.appendChild(factBtn);
+      }
       const nextBtn = document.createElement("button");
       nextBtn.id = "quizNextBtn";
       nextBtn.textContent = qi + 1 < questions.length ? "Дальше →" : "Узнать результат";
@@ -1299,6 +1318,38 @@ function openQuizModal(key){
   openModal(`<div class="quiz-modal-placeholder"></div>`, overlay => {
     renderQuestion(overlay);
   }, { closeOnBackdrop: false, wide: true });
+}
+
+// Попап "узнать факт" после ответа на вопрос квиза — показывается ПОВЕРХ самого квиза отдельным
+// независимым окном (не через openModal/closeModal, те закрыли бы квиз целиком), чтобы прогресс
+// игры не терялся. Закрывается крестиком сверху или кнопкой снизу, как обычные попапы на сайте.
+function showQuizFactPopup(factDate){
+  const html = DAILY_FACTS[factDate];
+  if(!html) return;
+  const [y, m, d] = factDate.split("-").map(Number);
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay quiz-fact-overlay";
+  overlay.innerHTML = `
+    <div class="modal">
+      <div class="fact-popup-header">
+        <div class="calendar-cell">
+          <div class="calendar-cell-dow">${MONTH_SHORT[m - 1]}</div>
+          <div class="calendar-cell-day">${d}</div>
+        </div>
+        <div class="fact-popup-title">Факт про этот вопрос:</div>
+        <button type="button" class="ghost icon-btn quiz-close-x" id="quizFactCloseX" title="Закрыть" aria-label="Закрыть">✕</button>
+      </div>
+      <div class="fact-popup-body">${html}</div>
+      <div class="modal-actions modal-actions-center">
+        <button id="quizFactCloseBtn">Понятно!</button>
+      </div>
+    </div>
+  `;
+  const close = () => overlay.remove();
+  overlay.addEventListener("click", e => { if(e.target === overlay) close(); });
+  overlay.querySelector("#quizFactCloseX").addEventListener("click", close);
+  overlay.querySelector("#quizFactCloseBtn").addEventListener("click", close);
+  document.body.appendChild(overlay);
 }
 
 // Клетка нового факта слегка покачивается и показывает короткую подсказку над собой — вместо
