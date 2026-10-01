@@ -403,7 +403,9 @@ header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; g
 .countdown-hero{
   max-width:640px; margin:0 auto 24px; display:flex; align-items:center; justify-content:center;
 }
-.countdown-label{font-size:1.05rem; font-weight:600; color:var(--text); white-space:nowrap; margin-left:8px;}
+.countdown-label{font-size:1.05rem; font-weight:600; color:var(--text); margin-left:8px;}
+.countdown-label-line{white-space:nowrap; text-align:left;}
+.countdown-label-hint{font-size:.85rem; font-weight:600; color:var(--accent-solid); margin-top:2px;}
 /* Ряд мини-календариков — по одной клетке на каждый оставшийся день. Последняя (день Х)
    вместо числа показывает эмодзи-праздник вместо даты. */
 .calendar-row{display:flex; align-items:center; gap:6px; justify-content:center; flex-wrap:wrap;}
