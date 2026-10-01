@@ -516,7 +516,11 @@ header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; g
 /* Квиз-попап закреплён к верху, а не центрирован — иначе при ответе, когда под вариантами
    дорисовывается блок с кнопками, вся модалка растёт и перецентровывается, из-за чего вопрос
    визуально прыгает вверх (см. openQuizModal в app.js). */
-.quiz-modal-overlay{align-items:flex-start;}
+/* Специфичность .modal-overlay.quiz-modal-overlay (а не просто .quiz-modal-overlay) НАРОЧНО выше
+   обычной .modal-overlay{align-items:center} — тот селектор определён ниже в файле и при равной
+   специфичности побеждал бы по порядку, несмотря на этот класс (проверено: computed align-items
+   оставался "center" без этого усиления). */
+.modal-overlay.quiz-modal-overlay{align-items:flex-start;}
 .quiz-edit-fact-select{width:100%; margin-bottom:8px;}
 /* Админ-редактор квиза: одна карточка на вопрос, радио слева от каждого варианта отмечает верный. */
 .quiz-edit-question{
