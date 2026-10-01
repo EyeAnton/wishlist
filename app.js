@@ -816,9 +816,11 @@ function renderCountdown(){
   // будущая дата, а обводить хотелось именно "где мы сейчас". Прошедшие клетки, и сегодняшняя ПОСЛЕ
   // прочтения факта (см. openFactModal — отмечает LS.factReadDate), выглядят слегка оторванными:
   // наклон + чем клетка старше, тем сильнее блёкнет (см. --cell-opacity ниже). Сегодняшняя, пока
-  // факт не открыт, стоит ровно и в полную силу — это и есть "непрочитано". Кликабельны клетки, для
-  // которых есть факт (включая сегодняшнюю, до или после прочтения). Владельцу (после входа)
-  // кликабельны вообще все клетки, включая будущие без текста, — так он может писать факты заранее.
+  // факт не открыт, стоит ровно и в полную силу — это и есть "непрочитано". Гостю кликабельны
+  // только клетки с квизом (факты сами по себе больше не открываются с календаря — их можно
+  // узнать только через кнопку "Узнать факт" после ответа в квизе, см. openQuizModal). Владельцу
+  // (после входа) кликабельны вообще все клетки, включая будущие без текста и квиза, — так он
+  // может писать факты и собирать квизы заранее.
   const canEditFacts = IS_ADMIN && state.isOwner;
   const totalDays = Math.round((target - CALENDAR_START) / DAY_MS) + 1;
   const daysSinceStart = Math.round((today - CALENDAR_START) / DAY_MS);
@@ -840,7 +842,10 @@ function renderCountdown(){
     const canView = d.getTime() <= today.getTime();
     const key = dateKey(d);
     const hasQuiz = !!(QUIZZES[key] && QUIZZES[key].questions && QUIZZES[key].questions.length);
-    const clickable = canEditFacts || (canView && (DAILY_FACTS[key] || hasQuiz));
+    // Гостям факты сами по себе больше не кликабельны — читать их можно только через квиз (кнопка
+    // "Узнать факт" после ответа, см. openQuizModal). Владельцу клик по-прежнему открывает
+    // редактор, в т.ч. дней с одним только фактом без квиза — ему нужно иметь возможность их писать.
+    const clickable = canEditFacts || (canView && hasQuiz);
     const tilted = isPastStrict || (isToday && todayFactRead);
     const dayContent = isTarget
       ? `<span class="calendar-cell-confetti">🎉</span><span class="calendar-cell-daynum">${d.getDate()}</span>`
@@ -1403,7 +1408,9 @@ function maybeShowDailyFact(){
   const latestOpened = today < target ? today : target;
   const key = dateKey(latestOpened);
   const hasQuiz = !!(QUIZZES[key] && QUIZZES[key].questions && QUIZZES[key].questions.length);
-  if(!DAILY_FACTS[key] && !hasQuiz) return;
+  // Подсвечиваем клетку, только если её вообще можно открыть — факты сами по себе больше не
+  // кликабельны для гостей (см. renderCountdown), подсвечивать нечего кликнуть было бы обманом.
+  if(!hasQuiz) return;
   if(localStorage.getItem(LS.dailyFactSeen) === key) return;
   highlightNewFactCell(key);
   localStorage.setItem(LS.dailyFactSeen, key);
