@@ -504,12 +504,19 @@ header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; g
 .quiz-result-score{font-size:2.4rem; font-weight:700; color:var(--accent-solid); margin-bottom:10px;}
 .quiz-result-congrats{color:var(--text); line-height:1.5; margin:0;}
 .quiz-bonus-code{
-  margin-top:14px; padding:12px 14px; border-radius:10px; background:var(--reserved-bg); color:var(--reserved-text);
-  font-size:.9rem; line-height:1.45;
+  margin-top:14px; padding:14px; border-radius:10px; background:var(--reserved-bg); color:var(--reserved-text);
 }
-.quiz-bonus-code b{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; letter-spacing:.03em;}
+.quiz-bonus-code-intro{margin:0 0 8px; font-size:.9rem; line-height:1.45;}
+.quiz-bonus-code-word{
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:1.3rem; font-weight:700;
+  letter-spacing:.05em; text-align:center;
+}
 /* Поверх самого квиза (см. showQuizFactPopup в app.js) — выше обычного .modal-overlay (z-index:100). */
 .quiz-fact-overlay{z-index:150;}
+/* Квиз-попап закреплён к верху, а не центрирован — иначе при ответе, когда под вариантами
+   дорисовывается блок с кнопками, вся модалка растёт и перецентровывается, из-за чего вопрос
+   визуально прыгает вверх (см. openQuizModal в app.js). */
+.quiz-modal-overlay{align-items:flex-start;}
 .quiz-edit-fact-select{width:100%; margin-bottom:8px;}
 /* Админ-редактор квиза: одна карточка на вопрос, радио слева от каждого варианта отмечает верный. */
 .quiz-edit-question{
