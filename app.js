@@ -807,7 +807,11 @@ function renderCountdown(){
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const target = getBirthdayTarget(today);
   const daysLeft = Math.round((target - today) / DAY_MS);
-  const label = daysLeft <= 0 ? "Сегодня 1 октября! 🎉" : `До ДР Антона ${daysLeft} ${daysWord(daysLeft)}!`;
+  // Второй строкой под "Сегодня 1 октября!" — короткая подсказка про квиз, появляется вместе с
+  // этим текстом (т.е. именно в день Х), чтобы гость сразу понял, куда вести взгляд.
+  const label = daysLeft <= 0
+    ? `<div class="countdown-label-line">Сегодня 1 октября! 🎉</div><div class="countdown-label-line countdown-label-hint">👈 квиз про Антона!</div>`
+    : `<div class="countdown-label-line">До ДР Антона ${daysLeft} ${daysWord(daysLeft)}!</div>`;
 
   // По клеточке на каждый день от фиксированного старта до 1 октября — ряд не сжимается со
   // временем. У последней клетки (день Х) число остаётся на месте (иначе неясно, что это именно
