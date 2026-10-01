@@ -786,6 +786,10 @@ let DAILY_FACTS = { ...DEFAULT_DAILY_FACTS };
 // обычного факта играет в него (см. renderCountdown), а факт остаётся в базе про запас.
 let QUIZZES = {};
 
+// Минимальный счёт, при котором показывается бонус-код (см. openQuizModal/renderResult) — ниже
+// порога вместо поздравления и кода показываем мягкое "попробуй ещё раз".
+const QUIZ_BONUS_THRESHOLD = 7;
+
 function dateKey(d){
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
@@ -1306,13 +1310,18 @@ function openQuizModal(key){
     }
   }
 
+  // Бонус-код виден только тем, кто набрал QUIZ_BONUS_THRESHOLD и больше — остальным вместо
+  // поздравительного текста показываем мягкое "попробуй ещё раз" (без доступа к бонусу).
   function renderResult(overlay){
     const body = overlay.querySelector(".modal");
+    const passed = score >= QUIZ_BONUS_THRESHOLD;
     body.innerHTML = `
       <div class="quiz-result">
         <div class="quiz-result-score">${score} / ${questions.length}</div>
-        <p class="quiz-result-congrats">${escapeHtml(quiz.congratsText || "Спасибо, что так хорошо меня знаешь! 🎉")}</p>
-        ${quiz.bonusCode ? `
+        <p class="quiz-result-congrats">${passed
+          ? escapeHtml(quiz.congratsText || "Спасибо, что так хорошо меня знаешь! 🎉")
+          : "Спасибо за участие! Самую малость не хватило — попробуйте ещё раз 😊"}</p>
+        ${passed && quiz.bonusCode ? `
           <div class="quiz-bonus-code">
             Напишите мне кодовое слово <b>${escapeHtml(quiz.bonusCode)}</b> с 3 по 7 октября — и я вышлю вам бонус! 🎁
           </div>
