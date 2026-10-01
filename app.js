@@ -1063,6 +1063,11 @@ function openQuizEditModal(key){
       <label>Текст поздравления в конце игры</label>
       <textarea id="quizCongratsText" rows="2">${escapeHtml((existing && existing.congratsText) || "Спасибо, что так хорошо меня знаешь! 🎉")}</textarea>
     </div>
+    <div class="field">
+      <label>Бонус-код (необязательно)</label>
+      <input type="text" id="quizBonusCode" placeholder="Например: HB-0729" value="${escapeHtml((existing && existing.bonusCode) || "")}">
+      <small>Если заполнено, на экране результата появится: «Напишите мне кодовое слово ‹код› с 3 по 7 октября — и я вышлю вам бонус! 🎁»</small>
+    </div>
     <div class="error-text" id="quizEditError"></div>
     <div class="modal-actions">
       ${existing ? '<button class="danger left" id="quizDeleteBtn">Вернуть обычный факт</button>' : ""}
@@ -1160,12 +1165,14 @@ function openQuizEditModal(key){
       }
       errEl.textContent = "";
       const congratsText = overlay.querySelector("#quizCongratsText").value.trim() || "Спасибо, что так хорошо меня знаешь! 🎉";
+      const bonusCode = overlay.querySelector("#quizBonusCode").value.trim() || null;
       await withLoadingButton(overlay.querySelector("#quizSaveBtn"), async () => {
         await set(quizRef(key), {
           questions: questions.map(q => q.type === "guess"
             ? { type: "guess", question: q.question.trim(), answerValue: q.answerValue, unit: (q.unit || "").trim(), factDate: q.factDate || null }
             : { type: "mc", question: q.question.trim(), options: q.options.map(o => o.trim()), correctIndex: q.correctIndex, factDate: q.factDate || null }),
           congratsText,
+          bonusCode,
         });
         closeModal();
         showToast("Квиз сохранён");
@@ -1305,6 +1312,11 @@ function openQuizModal(key){
       <div class="quiz-result">
         <div class="quiz-result-score">${score} / ${questions.length}</div>
         <p class="quiz-result-congrats">${escapeHtml(quiz.congratsText || "Спасибо, что так хорошо меня знаешь! 🎉")}</p>
+        ${quiz.bonusCode ? `
+          <div class="quiz-bonus-code">
+            Напишите мне кодовое слово <b>${escapeHtml(quiz.bonusCode)}</b> с 3 по 7 октября — и я вышлю вам бонус! 🎁
+          </div>
+        ` : ""}
         <div class="modal-actions modal-actions-center">
           <button id="quizCloseBtn">Закрыть</button>
         </div>
