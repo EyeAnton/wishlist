@@ -503,6 +503,9 @@ header.topbar h1{font-size:1.6rem; margin:0; display:flex; align-items:center; g
 .quiz-result{position:relative; z-index:2; text-align:center; padding:12px 0;}
 .quiz-result-score{font-size:2.4rem; font-weight:700; color:var(--accent-solid); margin-bottom:10px;}
 .quiz-result-congrats{color:var(--text); line-height:1.5; margin:0;}
+/* Поверх самого квиза (см. showQuizFactPopup в app.js) — выше обычного .modal-overlay (z-index:100). */
+.quiz-fact-overlay{z-index:150;}
+.quiz-edit-fact-select{width:100%; margin-bottom:8px;}
 /* Админ-редактор квиза: одна карточка на вопрос, радио слева от каждого варианта отмечает верный. */
 .quiz-edit-question{
   border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:12px; background:var(--card);
