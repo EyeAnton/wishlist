@@ -1070,7 +1070,7 @@ function openQuizEditModal(key){
     <div class="field">
       <label>Бонус-код (необязательно)</label>
       <input type="text" id="quizBonusCode" placeholder="Например: HB-0729" value="${escapeHtml((existing && existing.bonusCode) || "")}">
-      <small>Если заполнено, на экране результата появится: «Напишите мне кодовое слово ‹код› с 3 по 7 октября — и я вышлю вам бонус! 🎁»</small>
+      <small>Если заполнено и набрано 7+ баллов — на экране результата появится: «Напишите мне это кодовое слово до 7 октября — и я вышлю вам бонус! 🎁» и сам код отдельной строкой.</small>
     </div>
     <div class="error-text" id="quizEditError"></div>
     <div class="modal-actions">
@@ -1323,7 +1323,8 @@ function openQuizModal(key){
           : "Спасибо за участие! Самую малость не хватило — попробуйте ещё раз 😊"}</p>
         ${passed && quiz.bonusCode ? `
           <div class="quiz-bonus-code">
-            Напишите мне кодовое слово <b>${escapeHtml(quiz.bonusCode)}</b> с 3 по 7 октября — и я вышлю вам бонус! 🎁
+            <p class="quiz-bonus-code-intro">Напишите мне это кодовое слово до 7 октября — и я вышлю вам бонус! 🎁</p>
+            <div class="quiz-bonus-code-word">${escapeHtml(quiz.bonusCode)}</div>
           </div>
         ` : ""}
         <div class="modal-actions modal-actions-center">
@@ -1337,6 +1338,10 @@ function openQuizModal(key){
   }
 
   openModal(`<div class="quiz-modal-placeholder"></div>`, overlay => {
+    // Закреплено к верху экрана (не центрировано), чтобы при ответе — когда под вариантами
+    // дорисовывается блок с кнопками и модалка становится выше — верхняя часть с вопросом не
+    // прыгала вверх из-за перецентровки, а рост шёл только вниз.
+    overlay.classList.add("quiz-modal-overlay");
     renderQuestion(overlay);
   }, { closeOnBackdrop: false, wide: true });
 }
