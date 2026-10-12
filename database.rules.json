@@ -1,0 +1,37 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": "auth != null && auth.token.email === 'leritosha@gmail.com' && auth.token.email_verified === true",
+
+    "items": {
+      ".read": true,
+      "$id": {
+        "reserved": {
+          ".write": "root.child('items/' + $id + '/title').exists() && root.child('items/' + $id + '/allowMultiple').val() !== true && newData.isBoolean() && (newData.val() === true) === newData.parent().parent().parent().child('reservations/' + $id).exists()"
+        },
+        "reservedCount": {
+          ".write": "root.child('items/' + $id + '/allowMultiple').val() === true && newData.isNumber() && newData.val() >= 0 && ((!data.exists() && newData.val() === 1) || (data.exists() && (newData.val() === data.val() + 1 || newData.val() === data.val() - 1))) && (newData.val() > 0) === newData.parent().parent().parent().child('reservations/' + $id).exists()"
+        }
+      }
+    },
+
+    "reservations": {
+      ".read": "auth != null && auth.token.email === 'leritosha13@gmail.com' && auth.token.email_verified === true",
+      "$id": {
+        "$key": {
+          ".write": "root.child('items/' + $id + '/title').exists() && ((!data.exists() && newData.isString() && newData.val().length > 0 && newData.val().length <= 60 && (root.child('items/' + $id + '/allowMultiple').val() === true || !root.child('reservations/' + $id).exists())) || (data.exists() && !newData.exists()))"
+        }
+      }
+    },
+
+    "facts": { ".read": true },
+    "quizzes": { ".read": true },
+
+    "sky": {
+      "bonusStars": {
+        ".read": true,
+        "$key": { ".write": true }
+      }
+    }
+  }
+}

@@ -9,7 +9,8 @@ const CONFIG = {
   HELPER_EMAIL: "leritosha13@gmail.com", // видит, кто что дарит, но не может редактировать список
   // Отдельный Firebase-проект "wishlist" (console.firebase.google.com) — вход и хранение данных,
   // те же принципы, что и в leritonmap: вход через Google, доступ владельца по email,
-  // правила Realtime Database ограничивают запись гостей только полем reservedBy.
+  // правила Realtime Database (database.rules.json) пускают гостей писать только флажок брони
+  // в items и свою запись в reservations; имена дарителей в reservations читает только хелпер.
   FIREBASE_CONFIG: {
     apiKey: "AIzaSyCWSp3MjlZPxAs6hrROmI83U-QxzKzej8w",
     authDomain: "wishlist-92432.firebaseapp.com",
@@ -54,6 +55,7 @@ const state = {
   items: [],
   isOwner: false,      // права на добавление/редактирование/удаление; статус брони не видит вообще (сюрприз)
   canSeeNames: false,  // хелпер (жена) — видит, кто что дарит, но не может менять список
+  reservations: {},    // имена дарителей — подгружаются только хелперу (см. watchReservations)
   ownerEmail: null,
   loading: true,
   viewCurrency: localStorage.getItem(LS.viewCurrency) || "original", // "original" = цена в валюте, в которой её ввели, без конвертации
@@ -162,6 +164,26 @@ async function copyNoteValue(value){
 
 function uid(){
   return (crypto.randomUUID ? crypto.randomUUID() : "id-" + Date.now() + "-" + Math.random().toString(16).slice(2));
+}
+
+// Имена дарителей лежат не в публичном items, а в reservations/<id>/<ключ>, который читает только
+// хелпер. Ключ выводится из самого имени (hex от UTF-8 в нижнем регистре), поэтому отменить бронь
+// может только тот, кто знает имя: гость не видит reservations и удаляет запись по ключу вслепую,
+// а правила разрешают удалить только существующую запись.
+const RESERVE_NAME_MAX = 60;
+function reservationKey(name){
+  const bytes = new TextEncoder().encode(name.trim().toLowerCase());
+  return "n" + Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
+}
+function reservationNames(item){
+  return Object.values(state.reservations[item.id] || {});
+}
+// reservedBy / reservedByMulti — старые публичные поля, живут только до migrateLegacyReservations.
+function reservedCount(item){
+  return item.reservedCount || Object.keys(item.reservedByMulti || {}).length;
+}
+function isReserved(item){
+  return item.allowMultiple ? reservedCount(item) > 0 : (item.reserved === true || !!item.reservedBy);
 }
 
 function showToast(message, isError){
@@ -1782,10 +1804,12 @@ function initGoogleSignIn(){
       state.isOwner = true;
       state.canSeeNames = false;
       state.ownerEmail = user.email;
+      migrateLegacyReservations();
     }else if(user && user.email === CONFIG.HELPER_EMAIL){
       state.isOwner = false;
       state.canSeeNames = true;
       state.ownerEmail = user.email;
+      watchReservations();
     }else{
       if(user){
         // вошёл, но этот email не в списке допущенных
@@ -1794,6 +1818,7 @@ function initGoogleSignIn(){
       }
       state.isOwner = false;
       state.canSeeNames = false;
+      state.reservations = {};
       state.ownerEmail = null;
     }
     renderAll();
@@ -1960,7 +1985,7 @@ function openItemModal(existingItem){
       overlay.querySelector("#deleteItemBtn").addEventListener("click", async () => {
         if(!confirm("Удалить этот подарок из списка?")) return;
         await withLoadingButton(overlay.querySelector("#deleteItemBtn"), async () => {
-          await remove(itemRef(item.id));
+          await update(ref(db), { [`items/${item.id}`]: null, [`reservations/${item.id}`]: null });
           closeModal();
           showToast("Подарок удалён");
         });
@@ -1969,7 +1994,11 @@ function openItemModal(existingItem){
       if(unreserveBtn){
         unreserveBtn.addEventListener("click", async () => {
           await withLoadingButton(unreserveBtn, async () => {
-            await update(itemRef(item.id), { reservedBy: "", reservedByMulti: null });
+            await update(ref(db), {
+              [`reservations/${item.id}`]: null,
+              [`items/${item.id}/reserved`]: null,
+              [`items/${item.id}/reservedCount`]: null,
+            });
             closeModal();
             showToast("Готово");
           });
@@ -2007,8 +2036,7 @@ function openItemModal(existingItem){
             await update(itemRef(item.id), data);
           }else{
             delete data.price;
-            const newItem = { reservedBy: "", ...data };
-            await set(itemRef(uid()), newItem);
+            await set(itemRef(uid()), data);
           }
           closeModal();
           showToast("Сохранено");
@@ -2112,18 +2140,28 @@ function openReserveModal(item){
         overlay.querySelector("#reserveError").textContent = "Введите имя";
         return;
       }
+      if(name.length > RESERVE_NAME_MAX){
+        overlay.querySelector("#reserveError").textContent = "Слишком длинное имя";
+        return;
+      }
       const btn = overlay.querySelector("#confirmReserve");
       await withLoadingButton(btn, async () => {
         try{
+          const current = state.items.find(i => i.id === item.id) || item;
+          const nameRef = `reservations/${item.id}/${reservationKey(name)}`;
           if(item.allowMultiple){
-            // Можно дарить несколько штук — просто добавляем свою запись в список, никого не
-            // блокируя. Ключ случайный (не само имя), чтобы в имени можно было использовать
-            // любые символы без риска сломать путь в Firebase.
-            await update(itemRef(item.id), { [`reservedByMulti/${uid()}`]: name });
+            // Можно дарить несколько штук — добавляем свою запись, никого не блокируя; в items
+            // виден только счётчик. Одно и то же имя дважды правила не пропустят (ключ уже занят).
+            await update(ref(db), {
+              [nameRef]: name,
+              [`items/${item.id}/reservedCount`]: (current.reservedCount || 0) + 1,
+            }).catch(() => { throw new Error("Не получилось — возможно, это имя уже записано. Обновите страницу"); });
           }else{
-            const current = state.items.find(i => i.id === item.id);
-            if(current && current.reservedBy) throw new Error("Этот подарок уже хотят подарить");
-            await update(itemRef(item.id), { reservedBy: name });
+            if(isReserved(current)) throw new Error("Этот подарок уже хотят подарить");
+            await update(ref(db), {
+              [nameRef]: name,
+              [`items/${item.id}/reserved`]: true,
+            }).catch(() => { throw new Error("Этот подарок уже хотят подарить"); });
           }
           closeModal();
           showThanksPopup();
@@ -2163,15 +2201,14 @@ function openCancelReserveModal(item){
       const btn = overlay.querySelector("#confirmCancelReserve");
       await withLoadingButton(btn, async () => {
         try{
-          if(item.allowMultiple){
-            const entries = Object.entries(item.reservedByMulti || {});
-            const match = entries.find(([, n]) => n.toLowerCase() === name.toLowerCase());
-            if(!match) throw new Error("Имя не совпадает");
-            await update(itemRef(item.id), { [`reservedByMulti/${match[0]}`]: null });
-          }else{
-            if(name.toLowerCase() !== (item.reservedBy||"").toLowerCase()) throw new Error("Имя не совпадает");
-            await update(itemRef(item.id), { reservedBy: "" });
-          }
+          // Гость не видит имён, поэтому сверку делают правила: удалить можно только
+          // существующую запись, а её ключ получается только из правильного имени.
+          const current = state.items.find(i => i.id === item.id) || item;
+          const nameRef = `reservations/${item.id}/${reservationKey(name)}`;
+          const changes = item.allowMultiple
+            ? { [nameRef]: null, [`items/${item.id}/reservedCount`]: Math.max((current.reservedCount || 0) - 1, 0) }
+            : { [nameRef]: null, [`items/${item.id}/reserved`]: false };
+          await update(ref(db), changes).catch(() => { throw new Error("Имя не совпадает"); });
           closeModal();
           showToast("Отменено");
         }catch(e){
@@ -2194,8 +2231,9 @@ function openDetailModal(item){
     : "";
 
   // Владельцу статус брони не показываем нигде, включая эту детальную карточку — см. renderCardFooter.
-  const reservedLine = (item.reservedBy && state.canSeeNames)
-    ? `<div class="reserved-badge" style="display:inline-flex;margin-bottom:10px;">🎁 Хотят подарить: ${escapeHtml(item.reservedBy)}</div>`
+  const detailNames = state.canSeeNames ? reservationNames(item) : [];
+  const reservedLine = detailNames.length
+    ? `<div class="reserved-badge" style="display:inline-flex;margin-bottom:10px;">🎁 Хотят подарить: ${detailNames.map(escapeHtml).join(", ")}</div>`
     : "";
 
   openModal(`
@@ -2228,7 +2266,7 @@ function openDetailModal(item){
     }else if(IS_ADMIN){
       // До входа на админ-странице — то же самое, никакой брони.
       actions.innerHTML = `<button class="secondary" id="detailClose">Закрыть</button>`;
-    }else if(item.reservedBy){
+    }else if(!item.allowMultiple && isReserved(item)){
       actions.innerHTML = `<button class="secondary" id="detailClose">Закрыть</button><button class="ghost" id="detailCancel">Отменить</button>`;
       actions.querySelector("#detailCancel").addEventListener("click", () => openCancelReserveModal(item));
     }else{
@@ -2603,13 +2641,10 @@ function renderCardFooter(item){
   // но список не редактирует.
   if(state.isOwner) return "";
   if(state.canSeeNames){
-    if(item.allowMultiple){
-      const names = item.reservedByMulti ? Object.values(item.reservedByMulti) : [];
-      if(!names.length) return `<span style="color:var(--muted);font-size:.85rem;">Свободно</span>`;
-      return `<span class="reserved-badge">🎁 Дарят: ${names.map(escapeHtml).join(", ")}</span>`;
-    }
-    if(!item.reservedBy) return `<span style="color:var(--muted);font-size:.85rem;">Свободно</span>`;
-    return `<span class="reserved-badge">🎁 Хотят подарить: ${escapeHtml(item.reservedBy)}</span>`;
+    const names = reservationNames(item);
+    if(!names.length) return `<span style="color:var(--muted);font-size:.85rem;">Свободно</span>`;
+    if(item.allowMultiple) return `<span class="reserved-badge">🎁 Дарят: ${names.map(escapeHtml).join(", ")}</span>`;
+    return `<span class="reserved-badge">🎁 Хотят подарить: ${escapeHtml(names[0])}</span>`;
   }
   // На админ-странице до входа владельца/хелпера бронировать нечем — это переходное состояние,
   // а не гостевой просмотр, так что кнопки "Хочу подарить" тут вообще быть не должно.
@@ -2621,14 +2656,14 @@ function renderCardFooter(item){
     // Бейдж и крестик отмены — первыми, кнопка "Хочу подарить" (full-btn, во всю ширину) —
     // последней: так она сама переносится на отдельную строку под ними, а не ломает раскладку,
     // пытаясь встать в 100% ширины ПЕРЕД остальными элементами строки.
-    const count = item.reservedByMulti ? Object.keys(item.reservedByMulti).length : 0;
+    const count = reservedCount(item);
     return `
       ${count > 0 ? `<span class="reserved-badge">🎁 ${count} ${peopleWord(count)} ${chooseVerb(count)} это</span>` : ""}
       ${count > 0 ? CANCEL_X_BTN : ""}
       <button class="full-btn reserveBtn">Хочу подарить</button>
     `;
   }
-  if(item.reservedBy){
+  if(isReserved(item)){
     // Имя не показываем гостям — его же нужно ввести, чтобы отменить. Покажи мы его тут,
     // любой гость мог бы подсмотреть и отменить чужую отметку.
     return `
@@ -2648,13 +2683,57 @@ function watchItems(){
   }
   onValue(ref(db, "items"), snap => {
     const val = snap.val() || {};
-    state.items = Object.keys(val).map(id => ({ id, reservedBy: "", ...val[id] }));
+    state.items = Object.keys(val).map(id => ({ id, ...val[id] }));
     state.loading = false;
+    migrateLegacyReservations();
     renderAll();
   }, err => {
     showToast(err.message, true);
     state.loading = false;
     renderAll();
+  });
+}
+
+// Имена дарителей — только для хелпера (правила не отдадут reservations никому больше).
+let reservationsWatched = false;
+function watchReservations(){
+  if(!db || reservationsWatched) return;
+  reservationsWatched = true;
+  onValue(ref(db, "reservations"), snap => {
+    state.reservations = snap.val() || {};
+    renderAll();
+  }, err => {
+    reservationsWatched = false;
+    showToast(err.message, true);
+  });
+}
+
+// Раньше имена лежали прямо в публичном items (reservedBy / reservedByMulti) — их мог прочитать
+// кто угодно. Когда входит владелец (у него права на запись), один раз переносим их в закрытый
+// reservations и стираем из items. Сами имена владельцу при этом нигде не показываются.
+let legacyMigrationDone = false;
+function migrateLegacyReservations(){
+  if(!db || !state.isOwner || legacyMigrationDone || state.loading) return;
+  const changes = {};
+  state.items.forEach(item => {
+    if(!("reservedBy" in item) && !("reservedByMulti" in item)) return;
+    const names = item.allowMultiple
+      ? Object.values(item.reservedByMulti || {})
+      : (item.reservedBy ? [item.reservedBy] : []);
+    const unique = new Map();
+    names.map(n => String(n).trim().slice(0, RESERVE_NAME_MAX)).filter(Boolean)
+      .forEach(n => unique.set(reservationKey(n), n));
+    unique.forEach((n, key) => { changes[`reservations/${item.id}/${key}`] = n; });
+    if(item.allowMultiple) changes[`items/${item.id}/reservedCount`] = unique.size || null;
+    else changes[`items/${item.id}/reserved`] = unique.size ? true : null;
+    changes[`items/${item.id}/reservedBy`] = null;
+    changes[`items/${item.id}/reservedByMulti`] = null;
+  });
+  legacyMigrationDone = true;
+  if(!Object.keys(changes).length) return;
+  update(ref(db), changes).catch(err => {
+    legacyMigrationDone = false;
+    showToast("Не получилось перенести брони: " + err.message, true);
   });
 }
 
