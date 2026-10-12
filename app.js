@@ -794,10 +794,35 @@ function dateKey(d){
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function getBirthdayTarget(today){
-  let target = new Date(today.getFullYear(), 9, 1); // месяцы с 0 — 9 это октябрь
-  if(target < today) target = new Date(today.getFullYear() + 1, 9, 1);
-  return target;
+// ДР зафиксирован на 1 октября 2026 (месяцы с 0 — 9 это октябрь): раньше цель перескакивала на
+// следующий год, и после праздника календарик растягивался на год вперёд.
+const BIRTHDAY_DATE = new Date(2026, 9, 1);
+
+function getBirthdayTarget(){
+  return BIRTHDAY_DATE;
+}
+
+// После праздника — без отсчёта: одна клетка 1 октября (по ней всё так же открывается факт/квиз
+// этого дня), а под ней благодарность гостям.
+function renderCountdownAfterBirthday(el){
+  const key = dateKey(BIRTHDAY_DATE);
+  const hasQuiz = !!(QUIZZES[key] && QUIZZES[key].questions && QUIZZES[key].questions.length);
+  const canEditFacts = IS_ADMIN && state.isOwner;
+  const clickable = canEditFacts || DAILY_FACTS[key] || hasQuiz;
+  el.innerHTML = `
+    <div class="calendar-done">
+      <div class="calendar-cell calendar-cell-target"${clickable ? ` data-fact-date="${key}"` : ""}>
+        <div class="calendar-cell-dow">${MONTH_SHORT[BIRTHDAY_DATE.getMonth()]}</div>
+        <div class="calendar-cell-day"><span class="calendar-cell-confetti">🎉</span><span class="calendar-cell-daynum">${BIRTHDAY_DATE.getDate()}</span></div>
+      </div>
+      <div class="countdown-thanks">Всем спасибо за участие и подарки!</div>
+    </div>
+  `;
+  const cell = el.querySelector(".calendar-cell[data-fact-date]");
+  if(cell) cell.addEventListener("click", () => {
+    if(canEditFacts) hasQuiz ? openQuizEditModal(key) : openFactEditModal(key);
+    else hasQuiz ? openQuizModal(key) : openFactModal(key);
+  });
 }
 
 function renderCountdown(){
@@ -805,7 +830,8 @@ function renderCountdown(){
   if(!el) return;
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const target = getBirthdayTarget(today);
+  const target = getBirthdayTarget();
+  if(today > target){ renderCountdownAfterBirthday(el); return; }
   const daysLeft = Math.round((target - today) / DAY_MS);
   // Второй строкой под "Сегодня 1 октября!" — короткая подсказка про квиз, появляется вместе с
   // этим текстом (т.е. именно в день Х), чтобы гость сразу понял, куда вести взгляд.
@@ -1408,7 +1434,7 @@ function maybeShowDailyFact(){
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   if(today < CALENDAR_START) return;
-  const target = getBirthdayTarget(today);
+  const target = getBirthdayTarget();
   const latestOpened = today < target ? today : target;
   const key = dateKey(latestOpened);
   const hasQuiz = !!(QUIZZES[key] && QUIZZES[key].questions && QUIZZES[key].questions.length);
