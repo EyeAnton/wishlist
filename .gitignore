@@ -1,0 +1,23 @@
+# Секреты и локальные настройки
+.env
+.env.*
+*.key
+service-account*.json
+
+# Firebase CLI / эмулятор
+.firebase/
+firebase-debug.log
+database-debug.log
+*-debug.log
+
+# Node
+node_modules/
+
+# Claude Code / worktree
+.claude/
+
+# Система и редакторы
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

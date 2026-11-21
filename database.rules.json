@@ -30,7 +30,16 @@
     "sky": {
       "bonusStars": {
         ".read": true,
-        "$key": { ".write": true }
+        "$key": {
+          ".write": true,
+          ".validate": "newData.hasChildren(['hue', 'opacity', 'left', 'top'])",
+          "hue": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() < 360" },
+          "opacity": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1" },
+          "left": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100" },
+          "top": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100" },
+          "name": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 60" },
+          "$other": { ".validate": false }
+        }
       }
     }
   }

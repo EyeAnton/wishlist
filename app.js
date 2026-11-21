@@ -655,7 +655,7 @@ function openStarNamePopup(key, data, starEl){
     <div class="star-name-popup">
       <p>Вы только что зажгли звезду, она будет светить всем!<br>Как вы назовёте эту звезду?</p>
       <div class="star-name-input-wrap">
-        <input type="text" id="starNameInput" value="${escapeHtml(suggested)}" placeholder="(впишите имя звезды)">
+        <input type="text" id="starNameInput" maxlength="60" value="${escapeHtml(suggested)}" placeholder="(впишите имя звезды)">
         <button type="button" id="starNameSaveBtn" aria-label="Назвать" title="Назвать">${STAR_NAME_CONFIRM_ICON}</button>
       </div>
       <button type="button" id="starExtinguishBtn" class="star-extinguish-link">Погасить звезду</button>
@@ -1804,6 +1804,8 @@ function initGoogleSignIn(){
       state.isOwner = true;
       state.canSeeNames = false;
       state.ownerEmail = user.email;
+      stopWatchingReservations();
+      state.reservations = {};
       migrateLegacyReservations();
     }else if(user && user.email === CONFIG.HELPER_EMAIL){
       state.isOwner = false;
@@ -1816,6 +1818,7 @@ function initGoogleSignIn(){
         showToast("У аккаунта " + user.email + " нет доступа", true);
         signOut(fbAuth);
       }
+      stopWatchingReservations();
       state.isOwner = false;
       state.canSeeNames = false;
       state.reservations = {};
@@ -2696,16 +2699,25 @@ function watchItems(){
 
 // Имена дарителей — только для хелпера (правила не отдадут reservations никому больше).
 let reservationsWatched = false;
+let unwatchReservations = null;
 function watchReservations(){
   if(!db || reservationsWatched) return;
   reservationsWatched = true;
-  onValue(ref(db, "reservations"), snap => {
+  unwatchReservations = onValue(ref(db, "reservations"), snap => {
     state.reservations = snap.val() || {};
     renderAll();
   }, err => {
     reservationsWatched = false;
+    unwatchReservations = null;
     showToast(err.message, true);
   });
+}
+// При выходе хелпера отписываемся сами — иначе Firebase отменит слушатель с permission_denied
+// и гость увидит красный тост с технической ошибкой.
+function stopWatchingReservations(){
+  if(unwatchReservations) unwatchReservations();
+  unwatchReservations = null;
+  reservationsWatched = false;
 }
 
 // Раньше имена лежали прямо в публичном items (reservedBy / reservedByMulti) — их мог прочитать
