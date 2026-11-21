@@ -1,0 +1,11 @@
+{
+  "name": "wishlist",
+  "private": true,
+  "description": "Вишлист с бронированием подарков (статичный сайт на GitHub Pages + Firebase Realtime Database)",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test",
+    "serve": "python3 -m http.server 8000"
+  }
+}
